@@ -12,7 +12,7 @@
                 extend: {
                     colors: {
                         dark: { 900: '#111827', 800: '#1f2937', 700: '#374151', 600: '#4b5563' },
-                        status: { pending: '#EAB308', scheduled: '#22C55E', done: '#3B82F6', displacement: '#F97316' } // Adicionado Laranja p/ Deslocamento
+                        status: { pending: '#EAB308', scheduled: '#22C55E', done: '#3B82F6', displacement: '#F97316' }
                     }
                 }
             }
@@ -22,8 +22,12 @@
     <style>
         .calendar-day { transition: all 0.2s; cursor: pointer; }
         .calendar-day:hover { background-color: rgba(59, 130, 246, 0.1); }
-        .calendar-day.active { background-color: #22C55E; color: white; border-color: #22C55E; }
+        /* A classe .active foi removida daqui pois será gerada dinamicamente via JS */
         #global-loader { backdrop-filter: blur(5px); }
+        
+        /* Scrollbar fina para a lista de online users */
+        #online-users-list::-webkit-scrollbar { height: 4px; }
+        #online-users-list::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-dark-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col font-sans">
@@ -66,6 +70,11 @@
                 </div>
             </div>
 
+            <div id="online-users-container" class="hidden lg:flex items-center gap-2 mr-auto ml-8 overflow-hidden max-w-md">
+                <span class="text-[10px] font-bold text-green-500 uppercase flex items-center gap-1"><i class="fas fa-circle text-[8px]"></i> Online:</span>
+                <div id="online-users-list" class="flex gap-2 text-xs text-gray-500 dark:text-gray-400 overflow-x-auto whitespace-nowrap pb-1"></div>
+            </div>
+
             <div class="flex items-center gap-3">
                 <button onclick="App.refreshData()" class="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 p-2 rounded-full w-10 h-10 flex items-center justify-center hover:rotate-180 transition duration-500 shadow-sm" title="Atualizar Dados">
                     <i class="fas fa-sync-alt"></i>
@@ -88,19 +97,55 @@
         </div>
 
         <main id="tab-dashboard" class="container mx-auto p-4 flex-1">
-            <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
-                <div class="flex gap-2">
-                    <button id="btn-create-os" onclick="View.openOSModal()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-medium flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Nova OS
-                    </button>
-                    <button id="btn-tech-team" onclick="View.openModal('modal-team')" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow font-medium flex items-center gap-2">
-                        <i class="fas fa-users"></i> Minha Equipe
-                    </button>
+            
+            <div id="financial-panel" class="hidden grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <div class="bg-white dark:bg-dark-800 p-3 rounded-lg shadow border-l-4 border-yellow-500">
+                    <p class="text-[10px] uppercase text-gray-500 font-bold">Total Pendente</p>
+                    <p class="text-lg font-bold text-yellow-600" id="stat-pending">R$ 0,00</p>
                 </div>
-                
-                <div id="financial-summary" class="hidden text-right">
-                     <p class="text-xs text-gray-500 uppercase font-bold">Total a Pagar</p>
-                     <p class="text-2xl font-bold text-green-500" id="total-revenue-value">R$ 0,00</p>
+                <div class="bg-white dark:bg-dark-800 p-3 rounded-lg shadow border-l-4 border-green-500">
+                    <p class="text-[10px] uppercase text-gray-500 font-bold">Total Pago</p>
+                    <p class="text-lg font-bold text-green-600" id="stat-paid">R$ 0,00</p>
+                </div>
+                <div class="bg-white dark:bg-dark-800 p-3 rounded-lg shadow border-l-4 border-blue-500">
+                    <p class="text-[10px] uppercase text-gray-500 font-bold">Selecionados</p>
+                    <p class="text-lg font-bold text-blue-600" id="stat-selected">R$ 0,00</p>
+                </div>
+                <div class="bg-white dark:bg-dark-800 p-3 rounded-lg shadow border-l-4 border-gray-500">
+                    <p class="text-[10px] uppercase text-gray-500 font-bold">Total Período</p>
+                    <p class="text-lg font-bold text-gray-600 dark:text-gray-300" id="stat-period">R$ 0,00</p>
+                </div>
+                <div class="bg-white dark:bg-dark-800 p-3 rounded-lg shadow border-l-4 border-purple-500 col-span-2 md:col-span-1">
+                    <p class="text-[10px] uppercase text-gray-500 font-bold">Total Geral</p>
+                    <p class="text-lg font-bold text-purple-600" id="stat-total">R$ 0,00</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white dark:bg-dark-800 p-4 rounded-lg shadow-sm">
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button id="btn-create-os" onclick="View.openOSModal()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-medium flex items-center gap-2 text-sm">
+                        <i class="fas fa-plus"></i> <span class="hidden sm:inline">Nova OS</span>
+                    </button>
+                    <button id="btn-tech-team" onclick="View.openModal('modal-team')" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow font-medium flex items-center gap-2 text-sm">
+                        <i class="fas fa-users"></i> <span class="hidden sm:inline">Equipe</span>
+                    </button>
+                    
+                    <div class="flex items-center bg-gray-100 dark:bg-dark-700 rounded-lg p-1 border dark:border-gray-600 flex-1 md:flex-none">
+                        <i class="fas fa-search text-gray-400 ml-2 text-xs"></i>
+                        <input type="text" id="filter-search" oninput="View.renderDashboard()" placeholder="Local ou Cód..." class="bg-transparent border-none text-sm p-2 focus:ring-0 w-full md:w-40 text-gray-700 dark:text-gray-200">
+                    </div>
+                    
+                    <div class="flex items-center gap-1">
+                        <input type="date" id="filter-start" onchange="View.renderDashboard()" class="bg-gray-100 dark:bg-dark-700 border dark:border-gray-600 text-sm p-2 rounded-lg w-32 text-gray-700 dark:text-gray-200">
+                        <span class="text-gray-400">-</span>
+                        <input type="date" id="filter-end" onchange="View.renderDashboard()" class="bg-gray-100 dark:bg-dark-700 border dark:border-gray-600 text-sm p-2 rounded-lg w-32 text-gray-700 dark:text-gray-200">
+                    </div>
+                </div>
+
+                <div id="mass-actions" class="hidden flex gap-2 w-full md:w-auto justify-end">
+                     <button onclick="App.markSelectedPaid()" class="bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2">
+                        <i class="fas fa-check-double"></i> Pagar Selecionados
+                     </button>
                 </div>
             </div>
 
@@ -112,8 +157,14 @@
             <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-xl font-bold">Disponibilidade da Equipe</h2>
-                    <div class="text-sm text-gray-500">
-                        <span class="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span> Disponível
+                    
+                    <div class="flex gap-2 items-center">
+                        <button id="btn-clear-calendar" onclick="App.clearCalendar()" class="hidden text-xs text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded px-3 py-1 transition mr-2">
+                            <i class="fas fa-trash"></i> Limpar Mês
+                        </button>
+                        <div class="text-sm text-gray-500 flex items-center">
+                            <span class="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span> Disponível
+                        </div>
                     </div>
                 </div>
                 
@@ -141,7 +192,7 @@
             
             <div class="flex-1 overflow-y-auto p-6 space-y-8">
                 <div class="bg-gray-50 dark:bg-dark-700 p-4 rounded-lg border dark:border-gray-600">
-                    <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">1. Gestão de Acessos (Tokens)</h4>
+                    <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">1. Gestão de Acessos</h4>
                     <form onsubmit="Admin.addUser(event)" class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4 bg-white dark:bg-dark-800 p-3 rounded shadow-sm">
                         <input type="text" name="name" placeholder="Nome" required class="md:col-span-1 p-2 border rounded dark:bg-dark-900 dark:border-gray-600 text-sm">
                         <input type="text" name="phone" placeholder="Telefone" class="md:col-span-1 p-2 border rounded dark:bg-dark-900 dark:border-gray-600 text-sm">
@@ -172,7 +223,6 @@
 
                 <div class="bg-gray-50 dark:bg-dark-700 p-4 rounded-lg border dark:border-gray-600">
                     <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">2. Base de Preços</h4>
-                    
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-xs uppercase text-gray-500 mb-1">Preço Base Único (R$)</label>
@@ -198,10 +248,7 @@
                         </button>
                     </div>
 
-                    <div id="simple-price-container" class="mb-4 text-xs text-gray-500 italic">
-                        * O sistema está usando o Preço Base Único para todas as empresas.
-                    </div>
-
+                    <div id="simple-price-container" class="mb-4 text-xs text-gray-500 italic">* Preço Base Único ativo.</div>
                     <div id="complex-price-container" class="hidden">
                         <div class="flex gap-2 mb-2">
                             <input type="text" id="new-company-name" placeholder="Nova Empresa" class="flex-1 p-2 rounded border dark:bg-dark-900 dark:border-gray-600 text-sm">
@@ -238,12 +285,10 @@
                         </div>
                     </div>
                 </div>
-
                 <div id="os-price-preview-box" class="md:col-span-2 bg-gray-100 dark:bg-dark-900 p-3 rounded flex justify-between items-center hidden">
                     <span class="text-sm text-gray-500">Valor Estimado:</span>
                     <span class="text-xl font-bold text-green-600" id="os-preview-total">R$ 0,00</span>
                 </div>
-                
                 <div class="md:col-span-2 flex justify-end gap-3 mt-4">
                     <button type="button" onclick="View.closeModal('modal-os')" class="px-4 py-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-dark-700 rounded transition">Cancelar</button>
                     <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow transition">Gerar OS</button>
@@ -306,7 +351,20 @@
                 companies: DEFAULT_COMPANIES,
                 config: { basePrice: 220, complexPricing: false, displacementPrice: 100 }
             },
-            currentUser: null
+            currentUser: null,
+            filters: { text: '', start: '', end: '' }, // Novo: Estado dos filtros
+            selectedOS: new Set() // Novo: Estado da seleção múltipla
+        };
+
+        // --- UTILS ---
+        const Utils = {
+            generateColor: (str) => {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                const h = Math.abs(hash) % 360;
+                return `hsl(${h}, 70%, 50%)`; 
+            },
+            formatCurrency: (val) => val.toLocaleString('pt-BR', { style:'currency', currency:'BRL' })
         };
 
         // --- DATABASE ---
@@ -326,9 +384,15 @@
                         state.data = { ...state.data, ...content };
                     }
 
-                    // Garante que a config nova exista (backward compatibility)
-                    if(state.data.config.displacementPrice === undefined) {
-                        state.data.config.displacementPrice = 100;
+                    // Migração: Garante que configs existam
+                    if(state.data.config.displacementPrice === undefined) state.data.config.displacementPrice = 100;
+
+                    // Atualiza Last Seen se estiver logado
+                    if(state.currentUser) {
+                        const me = state.data.users.find(u => u.id === state.currentUser.id);
+                        if(me) {
+                            me.last_seen = Date.now();
+                        }
                     }
 
                     return await DB.ensurePresetUsers();
@@ -346,7 +410,7 @@
                 PRESET_USERS.forEach(preset => {
                     const index = state.data.users.findIndex(u => u.token === preset.token);
                     if (index === -1) {
-                        state.data.users.push(preset);
+                        state.data.users.push({ ...preset, last_seen: 0 }); // Add last_seen default
                         changed = true;
                     }
                 });
@@ -360,6 +424,13 @@
             saveData: async (silent = false) => {
                 try {
                     if(!silent) View.toggleLoader(true, 'Salvando...');
+                    
+                    // Atualiza Last Seen ao salvar também
+                    if(state.currentUser) {
+                        const me = state.data.users.find(u => u.id === state.currentUser.id);
+                        if(me) me.last_seen = Date.now();
+                    }
+
                     await fetch(`https://api.github.com/gists/${CREDENTIALS.gistId}`, {
                         method: 'PATCH',
                         headers: { 
@@ -425,7 +496,8 @@
                     name: f.name.value,
                     phone: f.phone.value,
                     token: f.token.value,
-                    role: f.role.value
+                    role: f.role.value,
+                    last_seen: 0
                 };
                 if(state.data.users.find(u => u.token === newUser.token)) return View.toast('Token já existe!', 'error');
                 state.data.users.push(newUser);
@@ -488,7 +560,8 @@
             refreshData: async () => {
                 View.toggleLoader(true, 'Atualizando...');
                 await DB.loadData();
-                View.renderDashboard();
+                View.renderDashboard(); 
+                View.renderOnlineUsers();
                 View.toggleLoader(false);
                 View.toast('Dados atualizados!', 'success');
             },
@@ -517,6 +590,7 @@
                     unit_price: unitPrice,
                     total: qty * unitPrice,
                     status: 'pendente',
+                    payment_status: 'pendente', // Novo campo
                     is_displacement: false,
                     created_by: state.currentUser.name,
                     created_at: new Date().toISOString(),
@@ -534,6 +608,7 @@
             deleteOS: (osId) => {
                 if(!confirm("Tem certeza que deseja EXCLUIR esta OS?")) return;
                 state.data.orders = state.data.orders.filter(o => o.id !== osId);
+                state.selectedOS.delete(osId); // Limpa seleção
                 DB.saveData();
                 View.renderDashboard();
             },
@@ -543,10 +618,8 @@
                 if(!os) return;
 
                 if(os.is_displacement) {
-                    // Reverter (opcional, por segurança)
-                    if(!confirm("Esta OS já é Deslocamento. Deseja reverter para cobrança normal?")) return;
+                    if(!confirm("Reverter para cobrança normal?")) return;
                     os.is_displacement = false;
-                    // Recalcula preço normal
                     let unitPrice = state.data.config.basePrice;
                     if(state.data.config.complexPricing) {
                         const comp = state.data.companies.find(c => c.name === os.company);
@@ -555,10 +628,8 @@
                     os.unit_price = unitPrice;
                     os.total = os.qty * unitPrice;
                 } else {
-                    // Converter
                     const price = state.data.config.displacementPrice || 100;
-                    if(!confirm(`Converter para DESLOCAMENTO? \nO valor unitário mudará para R$ ${price.toFixed(2)}.`)) return;
-                    
+                    if(!confirm(`Converter para DESLOCAMENTO? Valor será R$ ${price.toFixed(2)}.`)) return;
                     os.is_displacement = true;
                     os.unit_price = price;
                     os.total = os.qty * price;
@@ -610,6 +681,33 @@
                 }
             },
 
+            changePaymentStatus: (osId, newStatus) => {
+                const os = state.data.orders.find(o => o.id === osId);
+                if(os) {
+                    os.payment_status = newStatus;
+                    DB.saveData();
+                    View.renderDashboard();
+                }
+            },
+
+            toggleSelectOS: (osId) => {
+                if(state.selectedOS.has(osId)) state.selectedOS.delete(osId);
+                else state.selectedOS.add(osId);
+                View.renderDashboard(false); // False evita recalcular tudo se não necessário (mas aqui recalc para somas)
+            },
+
+            markSelectedPaid: () => {
+                if(state.selectedOS.size === 0) return View.toast('Nenhuma OS selecionada', 'warning');
+                if(!confirm(`Marcar ${state.selectedOS.size} OS como PAGO?`)) return;
+
+                state.data.orders.forEach(o => {
+                    if(state.selectedOS.has(o.id)) o.payment_status = 'pago';
+                });
+                state.selectedOS.clear();
+                DB.saveData();
+                View.renderDashboard();
+            },
+
             toggleAvailability: (day) => {
                 if(state.currentUser.role !== 'PROVIDER' && state.currentUser.role !== 'TECH') return;
                 const dateStr = new Date().getFullYear() + '-' + (new Date().getMonth()+1).toString().padStart(2,'0') + '-' + day.toString().padStart(2,'0');
@@ -620,6 +718,13 @@
                 else state.data.availability.push({ providerId, dateStr });
                 
                 DB.saveData(true); 
+                View.renderCalendar();
+            },
+
+            clearCalendar: () => {
+                if(!confirm('Isso apagará TODAS as disponibilidades do calendário. Continuar?')) return;
+                state.data.availability = [];
+                DB.saveData();
                 View.renderCalendar();
             }
         };
@@ -641,21 +746,33 @@
                 const role = state.currentUser.role;
                 document.getElementById('user-role-badge').innerText = ROLE_LEVELS[role].label;
 
-                // Reset permissões visuais
+                // Reset UI Permissions
                 document.getElementById('btn-create-os').classList.add('hidden');
                 document.getElementById('btn-tech-team').classList.add('hidden');
                 document.getElementById('btn-admin-config').classList.add('hidden');
-                document.getElementById('financial-summary').classList.add('hidden');
+                document.getElementById('financial-panel').classList.add('hidden');
+                document.getElementById('mass-actions').classList.add('hidden');
+                document.getElementById('btn-clear-calendar').classList.add('hidden');
+                document.getElementById('online-users-container').classList.add('hidden');
 
-                if (role === 'ADMIN' || role === 'ANALYST') document.getElementById('btn-create-os').classList.remove('hidden');
+                if (role === 'ADMIN' || role === 'ANALYST') {
+                    document.getElementById('btn-create-os').classList.remove('hidden');
+                    document.getElementById('financial-panel').classList.remove('hidden');
+                    document.getElementById('mass-actions').classList.remove('hidden');
+                    document.getElementById('online-users-container').classList.remove('hidden');
+                }
                 if (role === 'PROVIDER') document.getElementById('btn-tech-team').classList.remove('hidden');
                 if (role === 'ADMIN') {
                     document.getElementById('btn-admin-config').classList.remove('hidden');
-                    document.getElementById('financial-summary').classList.remove('hidden');
+                    document.getElementById('btn-clear-calendar').classList.remove('hidden');
                 }
 
                 View.switchTab('dashboard');
                 View.renderTechTeam();
+                View.renderOnlineUsers();
+                
+                // Atualiza lista de online users periodicamente
+                setInterval(View.renderOnlineUsers, 60000); 
             },
 
             switchTab: (tabName) => {
@@ -669,6 +786,20 @@
 
                 if(tabName === 'dashboard') View.renderDashboard();
                 if(tabName === 'calendar') View.renderCalendar();
+            },
+
+            renderOnlineUsers: () => {
+                const container = document.getElementById('online-users-list');
+                // Apenas Admin vê online users
+                if(state.currentUser.role !== 'ADMIN' && state.currentUser.role !== 'ANALYST') return;
+                
+                const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+                // Filtra quem teve last_seen recente
+                const online = state.data.users.filter(u => u.last_seen > tenMinutesAgo);
+                
+                container.innerHTML = online.map(u => `
+                    <span title="${u.name}" class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200">${u.name.split(' ')[0]}</span>
+                `).join('');
             },
 
             openOSModal: () => {
@@ -690,25 +821,60 @@
                 document.getElementById('os-preview-total').innerText = `R$ ${(qty * price).toFixed(2)}`;
             },
 
-            renderDashboard: () => {
+            // --- Lógica Principal do Dashboard ---
+            renderDashboard: (shouldUpdateFinancials = true) => {
                 const list = document.getElementById('os-list');
-                let orders = state.data.orders;
+                
+                // 1. Coleta Filtros
+                state.filters.text = document.getElementById('filter-search').value.toLowerCase();
+                state.filters.start = document.getElementById('filter-start').value;
+                state.filters.end = document.getElementById('filter-end').value;
+
                 const role = state.currentUser.role;
                 const isAdminOrAnalyst = (role === 'ADMIN' || role === 'ANALYST');
 
-                if (role === 'PROVIDER') {
-                    orders = orders.filter(o => o.status === 'pendente' || o.assigned_tech !== null);
+                // 2. Filtra Ordens
+                let orders = state.data.orders.filter(os => {
+                    // Filtro de Permissão
+                    if (role === 'PROVIDER' && os.status === 'pendente' && os.assigned_tech === null) return true;
+                    if (role === 'PROVIDER' && os.assigned_tech !== null) return true; 
+                    if (isAdminOrAnalyst) return true;
+                    return false;
+                }).filter(os => {
+                    // Filtros de UI
+                    if (state.filters.text && !os.name.toLowerCase().includes(state.filters.text) && !os.code.includes(state.filters.text)) return false;
+                    const osDate = os.created_at.split('T')[0];
+                    if (state.filters.start && osDate < state.filters.start) return false;
+                    if (state.filters.end && osDate > state.filters.end) return false;
+                    return true;
+                });
+
+                // 3. Calcula Financeiro (Se admin/analista)
+                if(shouldUpdateFinancials && isAdminOrAnalyst) {
+                    const totalPending = orders.filter(o => o.payment_status === 'pendente').reduce((sum, o) => sum + o.total, 0);
+                    const totalPaid = orders.filter(o => o.payment_status === 'pago').reduce((sum, o) => sum + o.total, 0);
+                    const totalPeriod = orders.reduce((sum, o) => sum + o.total, 0);
+                    const totalAllTime = state.data.orders.reduce((sum, o) => sum + o.total, 0);
+                    
+                    let selectedTotal = 0;
+                    state.selectedOS.forEach(id => {
+                        const found = state.data.orders.find(o => o.id === id);
+                        if(found) selectedTotal += found.total;
+                    });
+
+                    document.getElementById('stat-pending').innerText = Utils.formatCurrency(totalPending);
+                    document.getElementById('stat-paid').innerText = Utils.formatCurrency(totalPaid);
+                    document.getElementById('stat-period').innerText = Utils.formatCurrency(totalPeriod);
+                    document.getElementById('stat-total').innerText = Utils.formatCurrency(totalAllTime);
+                    document.getElementById('stat-selected').innerText = Utils.formatCurrency(selectedTotal);
                 }
 
-                if (role === 'ADMIN') {
-                    const total = orders.filter(o => o.status !== 'pendente').reduce((acc, curr) => acc + curr.total, 0);
-                    document.getElementById('total-revenue-value').innerText = total.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
-                }
-
+                // 4. Renderiza Cards
                 list.innerHTML = orders.map(os => {
                     const isPending = os.status === 'pendente';
                     const isScheduled = os.status === 'agendada';
                     
+                    // Estilos de Status de Execução
                     let borderClass = isPending ? 'border-status-pending' : (isScheduled ? 'border-status-scheduled' : 'border-status-done');
                     let textClass = isPending ? 'text-status-pending' : (isScheduled ? 'text-status-scheduled' : 'text-status-done');
                     let statusLabel = isPending ? 'Pendente' : (isScheduled ? 'Agendada' : 'Concluída');
@@ -719,71 +885,104 @@
                         statusLabel = 'Deslocamento';
                     }
 
-                    // Ações principais (Agendar/Concluir)
-                    let mainActionsHtml = '';
+                    // Estilos de Status de Pagamento
+                    const payStatus = os.payment_status || 'pendente';
+                    let payColor = payStatus === 'pago' ? 'bg-green-100 text-green-700' : (payStatus === 'atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700');
+                    if(payStatus === 'nota_lancada') payColor = 'bg-blue-100 text-blue-700';
+
+                    const isChecked = state.selectedOS.has(os.id);
+
+                    // Ações de Agendamento
+                    let schedulingHtml = '';
                     if (role === 'PROVIDER' && isPending) {
                         const myTechs = state.data.technicians.filter(t => t.providerId === state.currentUser.id);
                         const options = myTechs.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
-                        mainActionsHtml = `
+                        schedulingHtml = `
                             <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                <label class="text-xs font-bold block mb-1 text-gray-500">Aceitar e Agendar</label>
+                                <label class="text-xs font-bold block mb-1 text-gray-500">Agendar Técnico</label>
                                 <div class="flex flex-col gap-2">
-                                    <select id="tech-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">${options || '<option>Cadastre técnicos primeiro</option>'}</select>
+                                    <select id="tech-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">${options || '<option>Cadastre técnicos...</option>'}</select>
                                     <input type="datetime-local" id="date-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">
                                     <button onclick="(() => {
                                         const t = document.getElementById('tech-${os.id}').value;
                                         const d = document.getElementById('date-${os.id}').value;
                                         if(t && d) App.assignOS('${os.id}', t, d);
                                         else View.toast('Informe técnico e data', 'warning');
-                                    })()" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-bold shadow">Confirmar Agendamento</button>
+                                    })()" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-bold shadow">Confirmar</button>
                                 </div>
                             </div>`;
                     } else if ((role === 'PROVIDER' || role === 'ADMIN') && isScheduled) {
-                        mainActionsHtml = `
+                        schedulingHtml = `
                              <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                <button onclick="App.concludeOS('${os.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold">Marcar como Concluída</button>
+                                <button onclick="App.concludeOS('${os.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold">Marcar Concluída</button>
                              </div>`;
                     }
 
-                    // Botões de Gestão (Excluir / Deslocamento) - Topo do Card
-                    let adminActions = '';
+                    // Rodapé com Ações Admin/Provider (Botões redesenhados)
+                    let cardFooter = '';
                     if(isAdminOrAnalyst) {
-                        adminActions = `
-                            <div class="absolute top-4 right-4 flex gap-2">
-                                <button onclick="App.convertToDisplacement('${os.id}')" title="${os.is_displacement ? 'Reverter Deslocamento' : 'Converter em Deslocamento'}" class="w-6 h-6 rounded flex items-center justify-center ${os.is_displacement ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-600'} transition">
-                                    <i class="fas fa-car-side text-xs"></i>
-                                </button>
-                                <button onclick="App.deleteOS('${os.id}')" title="Excluir OS" class="w-6 h-6 rounded flex items-center justify-center bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-600 transition">
-                                    <i class="fas fa-trash text-xs"></i>
-                                </button>
+                        cardFooter = `
+                            <div class="mt-4 pt-3 border-t dark:border-gray-700 flex justify-between items-center">
+                                <div class="flex gap-2">
+                                    <button onclick="App.convertToDisplacement('${os.id}')" class="text-xs font-bold text-gray-500 hover:text-orange-500 flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1 rounded transition">
+                                        <i class="fas fa-car-side"></i> ${os.is_displacement ? 'Reverter' : 'Desloc.'}
+                                    </button>
+                                    <button onclick="App.deleteOS('${os.id}')" class="text-xs font-bold text-gray-500 hover:text-red-500 flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1 rounded transition">
+                                        <i class="fas fa-trash"></i> Excluir
+                                    </button>
+                                </div>
+                                <select onchange="App.changePaymentStatus('${os.id}', this.value)" class="text-[10px] uppercase font-bold p-1 rounded bg-gray-200 dark:bg-dark-900 border-none outline-none cursor-pointer">
+                                    <option value="pendente" ${payStatus === 'pendente'?'selected':''}>Pendente</option>
+                                    <option value="pago" ${payStatus === 'pago'?'selected':''}>Pago</option>
+                                    <option value="atrasado" ${payStatus === 'atrasado'?'selected':''}>Atrasado</option>
+                                </select>
+                            </div>
+                        `;
+                    } else if (role === 'PROVIDER') {
+                         cardFooter = `
+                            <div class="mt-4 pt-3 border-t dark:border-gray-700 flex justify-end">
+                                 <select onchange="App.changePaymentStatus('${os.id}', this.value)" class="text-[10px] uppercase font-bold p-1 rounded bg-gray-200 dark:bg-dark-900 border-none outline-none cursor-pointer">
+                                    <option value="pendente" ${payStatus === 'pendente'?'selected':''}>Pgto. Pendente</option>
+                                    <option value="nota_lancada" ${payStatus === 'nota_lancada'?'selected':''}>Nota Lançada</option>
+                                    <option value="atrasado" ${payStatus === 'atrasado'?'selected':''}>Atrasado</option>
+                                </select>
                             </div>
                         `;
                     }
 
-                    const showPrice = role === 'ADMIN';
-
                     return `
-                        <div class="bg-white dark:bg-dark-800 rounded-lg shadow-lg border-l-4 ${borderClass} p-5 relative group hover:shadow-xl transition-all">
-                            ${adminActions}
-                            <div class="flex justify-between items-start mb-2 pr-12">
-                                <span class="bg-gray-100 dark:bg-dark-700 text-gray-500 text-xs px-2 py-1 rounded font-mono">#${os.code}</span>
-                                <span class="text-xs font-bold uppercase ${textClass} border border-current px-2 py-0.5 rounded-full">${statusLabel}</span>
+                        <div class="bg-white dark:bg-dark-800 rounded-lg shadow-lg border-l-4 ${borderClass} p-4 relative group hover:shadow-xl transition-all">
+                            
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex items-center gap-2">
+                                    ${isAdminOrAnalyst ? `<input type="checkbox" onchange="App.toggleSelectOS('${os.id}')" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer">` : ''}
+                                    <span class="bg-gray-100 dark:bg-dark-700 text-gray-500 text-xs px-2 py-1 rounded font-mono">#${os.code}</span>
+                                </div>
+                                <div class="flex flex-col items-end gap-1">
+                                    <span class="text-[10px] font-bold uppercase ${textClass} border border-current px-2 py-0.5 rounded-full">${statusLabel}</span>
+                                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${payColor}">${payStatus.replace('_', ' ')}</span>
+                                </div>
                             </div>
+
                             <h3 class="font-bold text-lg leading-tight mb-1 text-gray-800 dark:text-gray-100">${os.name}</h3>
-                            <p class="text-xs text-gray-400 mb-3"><i class="fas fa-map-marker-alt"></i> ${os.address}</p>
+                            <p class="text-xs text-gray-400 mb-3 truncate"><i class="fas fa-map-marker-alt"></i> ${os.address}</p>
+                            
                             <div class="grid grid-cols-2 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
                                 <div><span class="block text-[10px] uppercase text-gray-400">Elevadores</span> <strong>${os.qty}x (${os.company})</strong></div>
-                                ${showPrice ? `<div><span class="block text-[10px] uppercase text-gray-400">Total</span> <strong class="${os.is_displacement ? 'text-orange-500' : 'text-green-600'}">R$ ${os.total.toFixed(2)}</strong></div>` : ''}
+                                ${(isAdminOrAnalyst || role === 'PROVIDER') ? `<div><span class="block text-[10px] uppercase text-gray-400">Total</span> <strong class="${os.is_displacement ? 'text-orange-500' : 'text-green-600'}">R$ ${os.total.toFixed(2)}</strong></div>` : ''}
                                 <div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Técnico Local</span> ${os.tech_client}</div>
                                 ${os.contact ? `<div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Contato</span> <a href="https://wa.me/55${os.contact.replace(/\D/g,'')}" target="_blank" class="text-green-500 hover:underline"><i class="fab fa-whatsapp"></i> ${os.contact}</a></div>` : ''}
                             </div>
+
                             ${os.assigned_tech ? `
                                 <div class="mt-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 p-2 rounded">
                                     <div class="text-xs text-green-700 dark:text-green-400 font-bold"><i class="fas fa-user-check"></i> ${os.assigned_tech}</div>
                                     <div class="text-xs text-gray-500">${new Date(os.scheduled_date).toLocaleString()}</div>
                                 </div>
                             ` : ''}
-                            ${mainActionsHtml}
+
+                            ${schedulingHtml}
+                            ${cardFooter}
                         </div>`;
                 }).join('');
             },
@@ -801,15 +1000,45 @@
                 for(let i=1; i<=daysInMonth; i++) {
                     const dayStr = i.toString().padStart(2,'0');
                     const fullDate = `${today.getFullYear()}-${currentMonthStr}-${dayStr}`;
-                    const isMarked = state.data.availability.some(a => a.providerId === state.currentUser?.id && a.dateStr === fullDate);
                     
+                    const availabilities = state.data.availability.filter(a => a.dateStr === fullDate);
+                    const isMe = state.currentUser ? availabilities.some(a => a.providerId === state.currentUser.id) : false;
+                    
+                    // Estilização Dinâmica
+                    let bgStyle = 'bg-gray-50 dark:bg-dark-700';
+                    
+                    // Se eu sou provider e marquei: BRANCO (para destaque)
+                    if(isMe && state.currentUser.role === 'PROVIDER') {
+                        bgStyle = 'bg-white border-2 border-green-500 text-green-600 shadow-md transform scale-105 z-10';
+                    } else if (availabilities.length > 0) {
+                        // Se outros marcaram: Cor dinâmica suave
+                        bgStyle = 'bg-gray-100 dark:bg-dark-600';
+                    }
+
                     const div = document.createElement('div');
-                    div.className = `calendar-day h-16 rounded border bg-gray-50 dark:bg-dark-700 dark:border-gray-600 flex items-center justify-center font-bold text-gray-400 ${isMarked ? 'active' : ''}`;
-                    div.innerText = i;
+                    div.className = `calendar-day h-16 rounded border dark:border-gray-600 flex flex-col items-center justify-center font-bold text-gray-400 relative overflow-hidden ${bgStyle}`;
                     div.onclick = () => App.toggleAvailability(i);
+                    
+                    // Pontos coloridos para cada user
+                    const dots = document.createElement('div');
+                    dots.className = 'flex gap-1 mt-1 flex-wrap justify-center px-1';
+                    availabilities.forEach(a => {
+                        const u = state.data.users.find(x => x.id === a.providerId);
+                        if(u) {
+                            const dot = document.createElement('div');
+                            dot.className = 'w-2 h-2 rounded-full';
+                            dot.style.backgroundColor = Utils.generateColor(u.name);
+                            dot.title = u.name;
+                            dots.appendChild(dot);
+                        }
+                    });
+
+                    div.innerHTML = `<span class="z-10 text-sm">${i}</span>`;
+                    div.appendChild(dots);
                     grid.appendChild(div);
                 }
 
+                // Legenda de Cores
                 const availableMap = {};
                 state.data.availability.forEach(a => {
                     const provider = state.data.users.find(u => u.id === a.providerId);
@@ -821,7 +1050,13 @@
 
                 let html = '';
                 for (const [name, days] of Object.entries(availableMap)) {
-                    html += `<li class="border-b dark:border-gray-700 pb-1"><strong class="text-blue-500">${name}</strong>: Dias ${days.sort((a,b)=>a-b).join(', ')}</li>`;
+                    const color = Utils.generateColor(name);
+                    html += `
+                        <li class="border-b dark:border-gray-700 pb-1 flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full" style="background-color: ${color}"></span>
+                            <strong class="text-gray-700 dark:text-gray-300">${name}</strong>: 
+                            <span class="text-xs">Dias ${days.sort((a,b)=>a-b).join(', ')}</span>
+                        </li>`;
                 }
                 list.innerHTML = html || '<span class="text-gray-400 italic">Nenhuma disponibilidade marcada ainda.</span>';
             },
@@ -915,7 +1150,6 @@
 
         // Inicia
         DB.loadData();
-
     </script>
 </body>
 </html>
