@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema OS - Gestão Completa</title>
+    <title>Sistema OS - Eletromidia</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,7 +12,7 @@
                 extend: {
                     colors: {
                         dark: { 900: '#111827', 800: '#1f2937', 700: '#374151', 600: '#4b5563' },
-                        status: { pending: '#EAB308', scheduled: '#22C55E', done: '#3B82F6' } // Amarelo, Verde, Azul
+                        status: { pending: '#EAB308', scheduled: '#22C55E', done: '#3B82F6' }
                     }
                 }
             }
@@ -20,15 +20,22 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* Estilos extras para o calendário */
         .calendar-day { transition: all 0.2s; cursor: pointer; }
         .calendar-day:hover { background-color: rgba(59, 130, 246, 0.1); }
         .calendar-day.active { background-color: #22C55E; color: white; border-color: #22C55E; }
+        
+        /* Loading overlay */
+        #global-loader { backdrop-filter: blur(5px); }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-dark-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen font-sans flex flex-col">
+<body class="bg-gray-100 dark:bg-dark-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col font-sans">
 
     <div id="toast-container" class="fixed top-5 right-5 z-50 pointer-events-none"></div>
+
+    <div id="global-loader" class="fixed inset-0 z-[60] bg-black/50 flex flex-col items-center justify-center hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+        <p class="text-white font-bold text-lg" id="loader-text">Processando...</p>
+    </div>
 
     <section id="login-screen" class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white dark:bg-dark-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700">
@@ -37,17 +44,13 @@
                 <h1 class="text-2xl font-bold text-gray-700 dark:text-gray-200">Acesso ao Sistema</h1>
             </div>
             
-            <div class="mb-6">
+            <form onsubmit="Auth.login(event)" class="mb-6">
                 <label class="block mb-2 text-sm font-bold uppercase text-gray-500">Token de Acesso</label>
                 <input type="password" id="login-token" class="w-full p-3 rounded bg-gray-50 dark:bg-dark-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg tracking-widest" placeholder="• • • • • •">
-            </div>
-
-            <button onclick="Auth.login()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition shadow-lg transform hover:-translate-y-1">Entrar</button>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition shadow-lg transform hover:-translate-y-1 mt-4">Entrar</button>
+            </form>
             
-            <p class="mt-6 text-xs text-center text-gray-400">
-                Token Admin Padrão: <strong>sJ0r@jt5</strong><br>
-                (Use para configurar o sistema pela 1ª vez)
-            </p>
+            <div id="status-msg" class="text-center text-xs text-gray-400 min-h-[20px]"></div>
         </div>
     </section>
 
@@ -125,7 +128,6 @@
                 </div>
             </div>
         </main>
-
     </section>
 
     <div id="modal-admin-settings" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-50 p-4">
@@ -136,39 +138,8 @@
             </div>
             
             <div class="flex-1 overflow-y-auto p-6 space-y-8">
-                
                 <div class="bg-gray-50 dark:bg-dark-700 p-4 rounded-lg border dark:border-gray-600">
-                    <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">1. Base de Preços</h4>
-                    
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="text-sm font-medium">Usar Preços Complexos (Por Empresa)?</span>
-                        <button id="toggle-complex-price" onclick="Admin.toggleComplexPrice()" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200">
-                            <span class="transform transition ease-in-out duration-200 translate-x-1 inline-block w-4 h-4 rounded-full bg-white shadow"></span>
-                        </button>
-                    </div>
-
-                    <div id="simple-price-container" class="mb-4">
-                        <label class="block text-xs uppercase text-gray-500 mb-1">Preço Base Único (R$)</label>
-                        <div class="flex gap-2">
-                            <input type="number" id="admin-base-price" class="p-2 rounded border dark:bg-dark-900 dark:border-gray-600 w-32">
-                            <button onclick="Admin.saveBasePrice()" class="bg-blue-600 text-white px-4 rounded text-sm">Salvar</button>
-                        </div>
-                    </div>
-
-                    <div id="complex-price-container" class="hidden">
-                        <div class="flex gap-2 mb-2">
-                            <input type="text" id="new-company-name" placeholder="Nova Empresa (Ex: Schindler)" class="flex-1 p-2 rounded border dark:bg-dark-900 dark:border-gray-600 text-sm">
-                            <input type="number" id="new-company-price" placeholder="R$ 220" class="w-24 p-2 rounded border dark:bg-dark-900 dark:border-gray-600 text-sm">
-                            <button onclick="Admin.addCompany()" class="bg-green-600 text-white px-3 rounded"><i class="fas fa-plus"></i></button>
-                        </div>
-                        <ul id="admin-companies-list" class="space-y-1 max-h-40 overflow-y-auto">
-                            </ul>
-                    </div>
-                </div>
-
-                <div class="bg-gray-50 dark:bg-dark-700 p-4 rounded-lg border dark:border-gray-600">
-                    <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">2. Gestão de Acessos (Tokens)</h4>
-                    
+                    <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">1. Gestão de Acessos (Tokens)</h4>
                     <form onsubmit="Admin.addUser(event)" class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4 bg-white dark:bg-dark-800 p-3 rounded shadow-sm">
                         <input type="text" name="name" placeholder="Nome" required class="md:col-span-1 p-2 border rounded dark:bg-dark-900 dark:border-gray-600 text-sm">
                         <input type="text" name="phone" placeholder="Telefone" class="md:col-span-1 p-2 border rounded dark:bg-dark-900 dark:border-gray-600 text-sm">
@@ -192,21 +163,37 @@
                                     <th class="px-2 py-2 text-right">Ação</th>
                                 </tr>
                             </thead>
-                            <tbody id="admin-users-list">
-                                </tbody>
+                            <tbody id="admin-users-list"></tbody>
                         </table>
                     </div>
                 </div>
 
                 <div class="bg-gray-50 dark:bg-dark-700 p-4 rounded-lg border dark:border-gray-600">
-                    <h4 class="font-bold text-gray-500 mb-2 text-xs uppercase">Conexão com Banco de Dados (Gist)</h4>
-                    <div class="flex gap-2">
-                         <input type="text" id="cfg-gist-id" placeholder="Gist ID" class="flex-1 p-2 border rounded text-xs dark:bg-dark-900 dark:border-gray-600">
-                         <input type="password" id="cfg-github-token" placeholder="GitHub Token" class="flex-1 p-2 border rounded text-xs dark:bg-dark-900 dark:border-gray-600">
-                         <button onclick="DB.saveCredentials()" class="bg-gray-600 text-white px-3 rounded text-xs">Salvar</button>
+                    <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">2. Base de Preços</h4>
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-medium">Usar Preços Complexos (Por Empresa)?</span>
+                        <button id="toggle-complex-price" onclick="Admin.toggleComplexPrice()" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200">
+                            <span class="transform transition ease-in-out duration-200 translate-x-1 inline-block w-4 h-4 rounded-full bg-white shadow"></span>
+                        </button>
+                    </div>
+
+                    <div id="simple-price-container" class="mb-4">
+                        <label class="block text-xs uppercase text-gray-500 mb-1">Preço Base Único (R$)</label>
+                        <div class="flex gap-2">
+                            <input type="number" id="admin-base-price" class="p-2 rounded border dark:bg-dark-900 dark:border-gray-600 w-32">
+                            <button onclick="Admin.saveBasePrice()" class="bg-blue-600 text-white px-4 rounded text-sm">Salvar</button>
+                        </div>
+                    </div>
+
+                    <div id="complex-price-container" class="hidden">
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" id="new-company-name" placeholder="Nova Empresa" class="flex-1 p-2 rounded border dark:bg-dark-900 dark:border-gray-600 text-sm">
+                            <input type="number" id="new-company-price" placeholder="R$ 220" class="w-24 p-2 rounded border dark:bg-dark-900 dark:border-gray-600 text-sm">
+                            <button onclick="Admin.addCompany()" class="bg-green-600 text-white px-3 rounded"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <ul id="admin-companies-list" class="space-y-1 max-h-40 overflow-y-auto"></ul>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -215,12 +202,9 @@
         <div class="bg-white dark:bg-dark-800 p-6 rounded-lg w-full max-w-2xl shadow-xl border border-gray-200 dark:border-gray-700">
             <h3 class="text-xl font-bold mb-4 text-gray-800 dark:text-white">Nova Ordem de Serviço</h3>
             <form id="form-os" onsubmit="App.createOS(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
                 <input type="number" name="code" placeholder="Cód. Ponto *" required class="p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600">
                 <input type="text" name="name" placeholder="Nome do Condomínio/Local *" required class="p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600">
-                
                 <input type="text" name="address" placeholder="Endereço Completo" required class="md:col-span-2 p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600">
-                
                 <input type="text" name="tech_client" placeholder="Téc. Eletromidia Acompanhante" required class="p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600">
                 <input type="text" name="contact" placeholder="WhatsApp Contato" class="p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600">
 
@@ -229,8 +213,7 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="text-xs text-gray-500">Empresa Elevador</label>
-                            <select name="company" id="os-company-select" onchange="View.calcPreview()" class="w-full p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600">
-                                </select>
+                            <select name="company" id="os-company-select" onchange="View.calcPreview()" class="w-full p-2 rounded bg-gray-50 dark:bg-dark-900 border border-gray-300 dark:border-gray-600"></select>
                         </div>
                         <div>
                             <label class="text-xs text-gray-500">Quantidade</label>
@@ -255,7 +238,6 @@
     <div id="modal-team" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white dark:bg-dark-800 p-6 rounded-lg w-full max-w-lg shadow-xl">
             <h3 class="text-xl font-bold mb-4">Minha Equipe Técnica</h3>
-            
             <form onsubmit="App.addTechnician(event)" class="bg-gray-50 dark:bg-dark-700 p-3 rounded mb-4 grid grid-cols-1 gap-2">
                 <input type="text" name="name" placeholder="Nome Completo" required class="p-2 rounded text-sm dark:bg-dark-900 dark:border-gray-600 border">
                 <div class="flex gap-2">
@@ -264,10 +246,7 @@
                 </div>
                 <button type="submit" class="bg-purple-600 text-white py-2 rounded font-bold text-sm hover:bg-purple-700">Adicionar Técnico</button>
             </form>
-
-            <ul id="tech-list" class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                </ul>
-            
+            <ul id="tech-list" class="space-y-2 max-h-60 overflow-y-auto pr-2"></ul>
             <div class="mt-4 flex justify-end">
                 <button onclick="View.closeModal('modal-team')" class="px-4 py-2 text-gray-500">Fechar</button>
             </div>
@@ -275,7 +254,12 @@
     </div>
 
     <script>
-        // --- 1. DADOS INICIAIS E ESTRUTURA ---
+        // --- CONFIGURAÇÃO E DADOS ---
+        const CREDENTIALS = {
+            gistId: 'f28dc1c2c0874c8d7329deaa09aa6606',
+            token: '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'
+        };
+
         const DEFAULT_COMPANIES = [
             { name: 'Atlas', price: 220 },
             { name: 'Thyssen / Tke / Tk', price: 220 },
@@ -283,28 +267,13 @@
             { name: 'Outros', price: 220 }
         ];
 
-        // Usuário Admin Padrão (Indispensável)
-        const DEFAULT_ADMIN = { 
-            id: 'adm_master', 
-            name: 'Administrador Principal', 
-            phone: '', 
-            token: 'sJ0r@jt5', 
-            role: 'ADMIN' 
-        };
+        // Usuários Obrigatórios (Sempre serão recriados se deletados)
+        const PRESET_USERS = [
+            { id: 'adm_master', name: 'Administrador Principal', phone: '', token: 'sJ0r@jt5', role: 'ADMIN' },
+            { id: 'usr_david', name: 'David Lima', phone: '55 11 97605-1151', token: '123456', role: 'PROVIDER' },
+            { id: 'usr_zenilton', name: 'Zenilton Junior', phone: '55 11 95610-4913', token: 'Elt@2026', role: 'ANALYST' }
+        ];
 
-        const DEFAULT_DB = {
-            users: [DEFAULT_ADMIN],
-            orders: [],
-            technicians: [], // Lista global de técnicos associados a prestadores (por ID)
-            availability: [], // { providerId, dateStr }
-            companies: DEFAULT_COMPANIES,
-            config: { 
-                basePrice: 220,
-                complexPricing: false 
-            }
-        };
-
-        // Definição de Níveis
         const ROLE_LEVELS = {
             'ADMIN': { level: 4, label: 'Administrador' },
             'ANALYST': { level: 1, label: 'Analista' },
@@ -313,87 +282,128 @@
         };
 
         let state = {
-            data: structuredClone(DEFAULT_DB),
-            currentUser: null,
-            creds: { gistId: '', token: '' }
+            data: {
+                users: [],
+                orders: [],
+                technicians: [],
+                availability: [],
+                companies: DEFAULT_COMPANIES,
+                config: { basePrice: 220, complexPricing: false }
+            },
+            currentUser: null
         };
 
-        // --- 2. SERVIÇOS (API & DB) ---
+        // --- DATABASE ---
         const DB = {
-            init: async () => {
-                const storedCreds = localStorage.getItem('os_sys_creds');
-                if (storedCreds) state.creds = JSON.parse(storedCreds);
-                
-                // Tenta carregar dados. Se falhar ou não tiver config, usa default
-                const success = await DB.loadData();
-                if(!success) console.log("Iniciando com dados locais/padrão.");
-            },
-            
-            saveCredentials: () => {
-                const id = document.getElementById('cfg-gist-id').value.trim();
-                const token = document.getElementById('cfg-github-token').value.trim();
-                state.creds = { gistId: id, token: token };
-                localStorage.setItem('os_sys_creds', JSON.stringify(state.creds));
-                View.toast('Credenciais salvas. Recarregando...', 'success');
-                setTimeout(() => location.reload(), 1500);
-            },
-
+            // Adiciona timestamp para impedir que o navegador use cache antigo
             loadData: async () => {
-                if (!state.creds.gistId) return false;
                 try {
-                    const res = await fetch(`https://api.github.com/gists/${state.creds.gistId}`, {
-                        headers: { 'Authorization': `token ${state.creds.token}` }
+                    const cacheBuster = `?t=${Date.now()}`;
+                    const res = await fetch(`https://api.github.com/gists/${CREDENTIALS.gistId}${cacheBuster}`, {
+                        headers: { 'Authorization': `token ${CREDENTIALS.token}` }
                     });
-                    if (!res.ok) throw new Error('Erro API');
+                    
+                    if (!res.ok) throw new Error('Falha na conexão');
                     const json = await res.json();
-                    const content = JSON.parse(json.files['database.json'].content);
                     
-                    // Merge cuidadoso para garantir que novos campos existam
-                    state.data = { ...DEFAULT_DB, ...content };
-                    
-                    // Garante que o config tenha os campos novos
-                    if(state.data.config.complexPricing === undefined) state.data.config.complexPricing = false;
-                    if(!state.data.companies) state.data.companies = DEFAULT_COMPANIES;
-                    
-                    return true;
+                    if(json.files && json.files['database.json']) {
+                        const content = JSON.parse(json.files['database.json'].content);
+                        state.data = { ...state.data, ...content };
+                    }
+
+                    // Verifica e restaura usuários padrão se sumirem
+                    return await DB.ensurePresetUsers();
                 } catch (e) {
-                    console.error(e);
+                    console.error("Erro ao carregar.", e);
+                    // Se der erro (ex: offline), garante que pelo menos os presets existam na memória
+                    DB.ensurePresetUsers(true); 
                     return false;
                 }
             },
 
-            saveData: async () => {
-                if (!state.creds.gistId) return View.toast('Salvo localmente (Sem Gist)', 'warning');
+            // Garante que os usuários obrigatórios existam
+            ensurePresetUsers: async (offlineMode = false) => {
+                let changed = false;
+                
+                // Se array de usuários não existir, cria
+                if(!state.data.users) state.data.users = [];
+
+                PRESET_USERS.forEach(preset => {
+                    // Busca se existe pelo Token (para evitar duplicatas)
+                    const index = state.data.users.findIndex(u => u.token === preset.token);
+                    if (index === -1) {
+                        state.data.users.push(preset);
+                        changed = true;
+                    }
+                });
+                
+                // Se alterou algo e não estamos offline, salva imediatamente
+                if (changed && !offlineMode) {
+                    await DB.saveData(true); // true = silent mode
+                }
+                return true;
+            },
+
+            saveData: async (silent = false) => {
                 try {
-                    View.toast('Sincronizando...', 'info');
-                    await fetch(`https://api.github.com/gists/${state.creds.gistId}`, {
+                    if(!silent) View.toggleLoader(true, 'Salvando...');
+                    
+                    await fetch(`https://api.github.com/gists/${CREDENTIALS.gistId}`, {
                         method: 'PATCH',
                         headers: { 
-                            'Authorization': `token ${state.creds.token}`,
+                            'Authorization': `token ${CREDENTIALS.token}`,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
                             files: { 'database.json': { content: JSON.stringify(state.data) } }
                         })
                     });
-                    View.toast('Dados salvos na nuvem!', 'success');
+                    
+                    if(!silent) {
+                        View.toggleLoader(false);
+                        View.toast('Dados sincronizados!', 'success');
+                    }
                 } catch (e) {
-                    View.toast('Erro ao salvar no GitHub', 'error');
+                    if(!silent) {
+                        View.toggleLoader(false);
+                        View.toast('Erro ao salvar no servidor.', 'error');
+                    }
                 }
             }
         };
 
-        // --- 3. AUTENTICAÇÃO ---
+        // --- AUTH ---
         const Auth = {
-            login: () => {
+            login: async (e) => {
+                if(e) e.preventDefault();
+                
                 const inputToken = document.getElementById('login-token').value.trim();
-                const user = state.data.users.find(u => u.token === inputToken);
+                const statusDiv = document.getElementById('status-msg');
+                
+                if(!inputToken) return;
 
-                if (!user) return View.toast('Token inválido ou usuário não cadastrado.', 'error');
+                View.toggleLoader(true, 'Verificando credenciais...');
+                statusDiv.innerText = "Sincronizando banco de dados...";
+
+                // FORÇA O CARREGAMENTO ANTES DE LOGAR
+                // Isso garante que se você acabou de criar o user, ele vai aparecer
+                await DB.loadData();
+
+                const user = state.data.users.find(u => u.token === inputToken);
+                
+                View.toggleLoader(false);
+
+                if (!user) {
+                    View.toast('Token inválido ou não encontrado.', 'error');
+                    statusDiv.innerText = "Token inválido. Tente novamente.";
+                    return;
+                }
 
                 state.currentUser = user;
+                statusDiv.innerText = "";
                 View.startApp();
             },
+
             logout: () => {
                 state.currentUser = null;
                 document.getElementById('app-screen').classList.add('hidden');
@@ -402,9 +412,9 @@
             }
         };
 
-        // --- 4. ADMINISTRAÇÃO ---
+        // --- ADMIN LOGIC ---
         const Admin = {
-            addUser: (e) => {
+            addUser: async (e) => {
                 e.preventDefault();
                 const f = e.target;
                 const newUser = {
@@ -415,35 +425,39 @@
                     role: f.role.value
                 };
                 
-                // Validação simples de token único
                 if(state.data.users.find(u => u.token === newUser.token)) return View.toast('Token já existe!', 'error');
 
                 state.data.users.push(newUser);
-                DB.saveData();
+                // Salva e recarrega a lista
+                await DB.saveData();
                 View.renderAdminUsers();
                 f.reset();
-                View.toast('Usuário adicionado.', 'success');
             },
-            removeUser: (id) => {
-                if(id === 'adm_master') return View.toast('Não pode remover o Admin Principal.', 'error');
-                if(!confirm('Remover usuário?')) return;
+            
+            removeUser: async (id) => {
+                if(['adm_master'].includes(id)) return View.toast('Não pode remover o Admin Principal.', 'error');
+                
+                if(!confirm('Tem certeza? O usuário perderá o acesso imediatamente.')) return;
+                
                 state.data.users = state.data.users.filter(u => u.id !== id);
-                DB.saveData();
+                await DB.saveData();
                 View.renderAdminUsers();
             },
+
             toggleComplexPrice: () => {
                 state.data.config.complexPricing = !state.data.config.complexPricing;
-                DB.saveData();
-                View.renderAdminSettings(); // Re-render para atualizar UI do toggle
+                DB.saveData(); // Save normal (com toast)
+                View.renderAdminSettings();
             },
+
             saveBasePrice: () => {
                 const val = parseFloat(document.getElementById('admin-base-price').value);
                 if(val) {
                     state.data.config.basePrice = val;
                     DB.saveData();
-                    View.toast('Preço base global atualizado.', 'success');
                 }
             },
+
             addCompany: () => {
                 const name = document.getElementById('new-company-name').value;
                 const price = parseFloat(document.getElementById('new-company-price').value);
@@ -455,6 +469,7 @@
                     document.getElementById('new-company-price').value = '';
                 }
             },
+
             removeCompany: (idx) => {
                 state.data.companies.splice(idx, 1);
                 DB.saveData();
@@ -462,7 +477,7 @@
             }
         };
 
-        // --- 5. APP LOGIC (OS & Calendar) ---
+        // --- APP LOGIC ---
         const App = {
             createOS: (e) => {
                 e.preventDefault();
@@ -470,7 +485,6 @@
                 const qty = parseInt(f.qty.value);
                 const companyName = f.company.value;
 
-                // Lógica de Preço
                 let unitPrice = state.data.config.basePrice;
                 if(state.data.config.complexPricing) {
                     const comp = state.data.companies.find(c => c.name === companyName);
@@ -488,7 +502,7 @@
                     qty: qty,
                     unit_price: unitPrice,
                     total: qty * unitPrice,
-                    status: 'pendente', // pendente (amarelo) -> agendada (verde) -> concluida (azul)
+                    status: 'pendente',
                     created_by: state.currentUser.name,
                     created_at: new Date().toISOString(),
                     assigned_tech: null,
@@ -500,14 +514,11 @@
                 View.closeModal('modal-os');
                 View.renderDashboard();
                 f.reset();
-                View.toast('OS Criada com sucesso!', 'success');
             },
 
             addTechnician: (e) => {
                 e.preventDefault();
                 const f = e.target;
-                // Técnico vinculado ao prestador logado (providerId = currentUserId)
-                // Se o usuário logado for admin, ele pode estar apenas testando, então usamos o ID dele
                 const newTech = {
                     id: Date.now(),
                     providerId: state.currentUser.id,
@@ -530,12 +541,11 @@
             assignOS: (osId, techName, dateStr) => {
                 const os = state.data.orders.find(o => o.id === osId);
                 if (os) {
-                    os.status = 'agendada'; // Vira verde
+                    os.status = 'agendada';
                     os.assigned_tech = techName;
                     os.scheduled_date = dateStr;
                     DB.saveData();
                     View.renderDashboard();
-                    View.toast('Agendamento confirmado!', 'success');
                 }
             },
 
@@ -550,34 +560,42 @@
 
             toggleAvailability: (day) => {
                 if(state.currentUser.role !== 'PROVIDER' && state.currentUser.role !== 'TECH') return;
-
                 const dateStr = new Date().getFullYear() + '-' + (new Date().getMonth()+1).toString().padStart(2,'0') + '-' + day.toString().padStart(2,'0');
                 const providerId = state.currentUser.id;
-
-                // Check exists
                 const idx = state.data.availability.findIndex(a => a.providerId === providerId && a.dateStr === dateStr);
                 
-                if(idx >= 0) {
-                    state.data.availability.splice(idx, 1);
-                } else {
-                    state.data.availability.push({ providerId, dateStr });
-                }
-                DB.saveData();
+                if(idx >= 0) state.data.availability.splice(idx, 1);
+                else state.data.availability.push({ providerId, dateStr });
+                
+                DB.saveData(true); // Silent save
                 View.renderCalendar();
             }
         };
 
-        // --- 6. VIEW & RENDER ---
+        // --- VIEW ---
         const View = {
+            toggleLoader: (show, text = 'Carregando...') => {
+                const loader = document.getElementById('global-loader');
+                const txt = document.getElementById('loader-text');
+                txt.innerText = text;
+                if(show) loader.classList.remove('hidden');
+                else loader.classList.add('hidden');
+            },
+
             startApp: () => {
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('app-screen').classList.remove('hidden');
                 
-                // Configurar UI pelo Cargo
                 const role = state.currentUser.role;
                 document.getElementById('user-role-badge').innerText = ROLE_LEVELS[role].label;
 
-                // Permissões
+                // Reset permissões visuais
+                document.getElementById('btn-create-os').classList.add('hidden');
+                document.getElementById('btn-tech-team').classList.add('hidden');
+                document.getElementById('btn-admin-config').classList.add('hidden');
+                document.getElementById('financial-summary').classList.add('hidden');
+
+                // Aplica permissões
                 if (role === 'ADMIN' || role === 'ANALYST') document.getElementById('btn-create-os').classList.remove('hidden');
                 if (role === 'PROVIDER') document.getElementById('btn-tech-team').classList.remove('hidden');
                 if (role === 'ADMIN') {
@@ -586,7 +604,6 @@
                 }
 
                 View.switchTab('dashboard');
-                // Inicializa modais
                 View.renderTechTeam();
             },
 
@@ -604,12 +621,9 @@
             },
 
             openOSModal: () => {
-                // Popular empresas
                 const select = document.getElementById('os-company-select');
                 select.innerHTML = state.data.companies.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
-                
                 if(state.currentUser.role === 'ADMIN') document.getElementById('os-price-preview-box').classList.remove('hidden');
-                
                 View.openModal('modal-os');
                 View.calcPreview();
             },
@@ -618,12 +632,10 @@
                 const qty = document.getElementById('os-qty').value || 1;
                 const companyName = document.getElementById('os-company-select').value;
                 let price = state.data.config.basePrice;
-                
                 if(state.data.config.complexPricing) {
                     const c = state.data.companies.find(x => x.name === companyName);
                     if(c) price = c.price;
                 }
-                
                 document.getElementById('os-preview-total').innerText = `R$ ${(qty * price).toFixed(2)}`;
             },
 
@@ -632,32 +644,24 @@
                 let orders = state.data.orders;
                 const role = state.currentUser.role;
 
-                // Filtro para Prestador
                 if (role === 'PROVIDER') {
-                    orders = orders.filter(o => o.status === 'pendente' || o.assigned_tech !== null); // Vê pendentes gerais ou as suas
+                    orders = orders.filter(o => o.status === 'pendente' || o.assigned_tech !== null);
                 }
 
-                // Cálculo Financeiro (Admin)
                 if (role === 'ADMIN') {
-                    const total = orders
-                        .filter(o => o.status !== 'pendente')
-                        .reduce((acc, curr) => acc + curr.total, 0);
+                    const total = orders.filter(o => o.status !== 'pendente').reduce((acc, curr) => acc + curr.total, 0);
                     document.getElementById('total-revenue-value').innerText = total.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
                 }
 
                 list.innerHTML = orders.map(os => {
-                    const isPending = os.status === 'pendente'; // Amarelo
-                    const isScheduled = os.status === 'agendada'; // Verde
-                    const isDone = os.status === 'concluida'; // Azul
-
+                    const isPending = os.status === 'pendente';
+                    const isScheduled = os.status === 'agendada';
+                    
                     let borderClass = isPending ? 'border-status-pending' : (isScheduled ? 'border-status-scheduled' : 'border-status-done');
                     let textClass = isPending ? 'text-status-pending' : (isScheduled ? 'text-status-scheduled' : 'text-status-done');
                     let statusLabel = isPending ? 'Pendente' : (isScheduled ? 'Agendada' : 'Concluída');
 
-                    // Ações
                     let actionsHtml = '';
-                    
-                    // Prestador aceita OS Pendente
                     if (role === 'PROVIDER' && isPending) {
                         const myTechs = state.data.technicians.filter(t => t.providerId === state.currentUser.id);
                         const options = myTechs.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
@@ -674,19 +678,14 @@
                                         else View.toast('Informe técnico e data', 'warning');
                                     })()" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-bold shadow">Confirmar Agendamento</button>
                                 </div>
-                            </div>
-                        `;
-                    }
-                    // Finalizar OS
-                    else if ((role === 'PROVIDER' || role === 'ADMIN') && isScheduled) {
+                            </div>`;
+                    } else if ((role === 'PROVIDER' || role === 'ADMIN') && isScheduled) {
                         actionsHtml = `
                              <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                                 <button onclick="App.concludeOS('${os.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold">Marcar como Concluída</button>
-                             </div>
-                        `;
+                             </div>`;
                     }
 
-                    // Visibilidade de Preço
                     const showPrice = role === 'ADMIN';
 
                     return `
@@ -695,27 +694,22 @@
                                 <span class="bg-gray-100 dark:bg-dark-700 text-gray-500 text-xs px-2 py-1 rounded font-mono">#${os.code}</span>
                                 <span class="text-xs font-bold uppercase ${textClass} border border-current px-2 py-0.5 rounded-full">${statusLabel}</span>
                             </div>
-                            
                             <h3 class="font-bold text-lg leading-tight mb-1 text-gray-800 dark:text-gray-100">${os.name}</h3>
                             <p class="text-xs text-gray-400 mb-3"><i class="fas fa-map-marker-alt"></i> ${os.address}</p>
-                            
                             <div class="grid grid-cols-2 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
                                 <div><span class="block text-[10px] uppercase text-gray-400">Elevadores</span> <strong>${os.qty}x (${os.company})</strong></div>
                                 ${showPrice ? `<div><span class="block text-[10px] uppercase text-gray-400">Total</span> <strong class="text-green-600">R$ ${os.total.toFixed(2)}</strong></div>` : ''}
                                 <div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Técnico Local</span> ${os.tech_client}</div>
                                 ${os.contact ? `<div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Contato</span> <a href="https://wa.me/55${os.contact.replace(/\D/g,'')}" target="_blank" class="text-green-500 hover:underline"><i class="fab fa-whatsapp"></i> ${os.contact}</a></div>` : ''}
                             </div>
-
                             ${os.assigned_tech ? `
                                 <div class="mt-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 p-2 rounded">
                                     <div class="text-xs text-green-700 dark:text-green-400 font-bold"><i class="fas fa-user-check"></i> ${os.assigned_tech}</div>
                                     <div class="text-xs text-gray-500">${new Date(os.scheduled_date).toLocaleString()}</div>
                                 </div>
                             ` : ''}
-
                             ${actionsHtml}
-                        </div>
-                    `;
+                        </div>`;
                 }).join('');
             },
 
@@ -725,17 +719,13 @@
                 grid.innerHTML = '';
                 list.innerHTML = '';
 
-                // Simples Calendário do Mês Atual (30 dias fixos para demo visual)
                 const today = new Date();
                 const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
                 const currentMonthStr = (today.getMonth()+1).toString().padStart(2,'0');
                 
-                // Renderizar Dias
                 for(let i=1; i<=daysInMonth; i++) {
                     const dayStr = i.toString().padStart(2,'0');
                     const fullDate = `${today.getFullYear()}-${currentMonthStr}-${dayStr}`;
-                    
-                    // Verificar se o usuário atual marcou
                     const isMarked = state.data.availability.some(a => a.providerId === state.currentUser?.id && a.dateStr === fullDate);
                     
                     const div = document.createElement('div');
@@ -745,13 +735,12 @@
                     grid.appendChild(div);
                 }
 
-                // Renderizar Lista de Quem está livre (Agrupado)
                 const availableMap = {};
                 state.data.availability.forEach(a => {
                     const provider = state.data.users.find(u => u.id === a.providerId);
                     if(provider) {
                         if(!availableMap[provider.name]) availableMap[provider.name] = [];
-                        availableMap[provider.name].push(a.dateStr.split('-')[2]); // só o dia
+                        availableMap[provider.name].push(a.dateStr.split('-')[2]);
                     }
                 });
 
@@ -763,7 +752,6 @@
             },
 
             renderAdminSettings: () => {
-                // Preço e Toggle
                 document.getElementById('admin-base-price').value = state.data.config.basePrice;
                 const toggle = document.getElementById('toggle-complex-price');
                 const simpleContainer = document.getElementById('simple-price-container');
@@ -785,7 +773,6 @@
                     complexContainer.classList.add('hidden');
                 }
 
-                // Lista de Empresas
                 const cList = document.getElementById('admin-companies-list');
                 cList.innerHTML = state.data.companies.map((c, idx) => `
                     <li class="flex justify-between items-center bg-gray-100 dark:bg-dark-900 p-2 rounded text-sm">
@@ -799,35 +786,35 @@
 
             renderAdminUsers: () => {
                 const uList = document.getElementById('admin-users-list');
-                uList.innerHTML = state.data.users.map(u => `
+                // Ordena: Admin -> Analista -> Prestador
+                const sortedUsers = [...state.data.users].sort((a,b) => ROLE_LEVELS[b.role].level - ROLE_LEVELS[a.role].level);
+
+                uList.innerHTML = sortedUsers.map(u => {
+                    const isPreset = PRESET_USERS.some(p => p.id === u.id);
+                    return `
                     <tr class="bg-white dark:bg-dark-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-dark-700">
                         <td class="px-2 py-2 font-medium text-gray-900 dark:text-white">${u.name}</td>
                         <td class="px-2 py-2 font-mono text-xs">${u.token}</td>
                         <td class="px-2 py-2 text-xs">${ROLE_LEVELS[u.role].label}</td>
                         <td class="px-2 py-2 text-right">
-                            ${u.id !== 'adm_master' ? 
+                            ${!isPreset ? 
                                 `<button onclick="Admin.removeUser('${u.id}')" class="text-red-600 hover:text-red-900"><i class="fas fa-trash"></i></button>` : 
-                                '<span class="text-gray-300 text-xs">Principal</span>'
+                                '<span class="text-gray-300 text-xs">Fixo</span>'
                             }
                         </td>
                     </tr>
-                `).join('');
+                `}).join('');
             },
 
             renderTechTeam: () => {
                 const list = document.getElementById('tech-list');
-                // Se for Admin, mostra todos. Se for Prestador, só os dele.
                 let techs = state.data.technicians;
                 if(state.currentUser.role === 'PROVIDER') {
                     techs = techs.filter(t => t.providerId === state.currentUser.id);
                 }
-
                 list.innerHTML = techs.map(t => `
                     <li class="flex justify-between items-center bg-gray-50 dark:bg-dark-900 p-2 rounded border dark:border-gray-600">
-                        <div>
-                            <p class="font-bold text-sm">${t.name}</p>
-                            <p class="text-xs text-gray-500">${t.phone} ${t.doc ? '| ' + t.doc : ''}</p>
-                        </div>
+                        <div><p class="font-bold text-sm">${t.name}</p><p class="text-xs text-gray-500">${t.phone}</p></div>
                         <button onclick="App.removeTechnician(${t.id})" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
                     </li>
                 `).join('');
@@ -850,11 +837,9 @@
             }
         };
 
-        // --- INICIALIZAÇÃO ---
-        DB.init().then(() => {
-            // Se estiver em modo desenvolvimento (sem Gist ainda), garante Admin Padrão
-            if(state.data.users.length === 0) state.data.users.push(DEFAULT_ADMIN);
-        });
+        // Inicia
+        // Se a pessoa abrir a página e for offline, pelo menos os users padrão funcionam
+        DB.loadData();
 
     </script>
 </body>
