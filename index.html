@@ -902,7 +902,12 @@
                                 <label class="text-xs font-bold block mb-1 text-gray-500">Agendar Técnico</label>
                                 <div class="flex flex-col gap-2">
                                     <select id="tech-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">${options || '<option>Cadastre técnicos...</option>'}</select>
-                                    <input type="datetime-local" id="date-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">
+                                    <input
+  type="datetime-local"
+  id="date-mlmwsmml"
+  class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600
+         dark:[&::-webkit-calendar-picker-indicator]:invert"
+>
                                     <button onclick="(() => {
                                         const t = document.getElementById('tech-${os.id}').value;
                                         const d = document.getElementById('date-${os.id}').value;
@@ -1153,3 +1158,4 @@
     </script>
 </body>
 </html>
+
