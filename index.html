@@ -12,7 +12,7 @@
                 extend: {
                     colors: {
                         dark: { 900: '#111827', 800: '#1f2937', 700: '#374151', 600: '#4b5563' },
-                        status: { pending: '#EAB308', scheduled: '#22C55E', done: '#3B82F6' }
+                        status: { pending: '#EAB308', scheduled: '#22C55E', done: '#3B82F6', displacement: '#F97316' } // Adicionado Laranja p/ Deslocamento
                     }
                 }
             }
@@ -23,8 +23,6 @@
         .calendar-day { transition: all 0.2s; cursor: pointer; }
         .calendar-day:hover { background-color: rgba(59, 130, 246, 0.1); }
         .calendar-day.active { background-color: #22C55E; color: white; border-color: #22C55E; }
-        
-        /* Loading overlay */
         #global-loader { backdrop-filter: blur(5px); }
     </style>
 </head>
@@ -69,6 +67,10 @@
             </div>
 
             <div class="flex items-center gap-3">
+                <button onclick="App.refreshData()" class="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 p-2 rounded-full w-10 h-10 flex items-center justify-center hover:rotate-180 transition duration-500 shadow-sm" title="Atualizar Dados">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+
                 <button id="btn-admin-config" onclick="View.openModal('modal-admin-settings')" class="hidden bg-gray-200 dark:bg-dark-700 hover:bg-gray-300 dark:hover:bg-dark-600 p-2 rounded-full w-10 h-10 flex items-center justify-center transition" title="Configurações">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -170,19 +172,34 @@
 
                 <div class="bg-gray-50 dark:bg-dark-700 p-4 rounded-lg border dark:border-gray-600">
                     <h4 class="font-bold text-blue-600 mb-4 border-b pb-2 dark:border-gray-600">2. Base de Preços</h4>
-                    <div class="flex items-center justify-between mb-4">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs uppercase text-gray-500 mb-1">Preço Base Único (R$)</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="admin-base-price" class="p-2 rounded border dark:bg-dark-900 dark:border-gray-600 w-full">
+                                <button onclick="Admin.saveBasePrice()" class="bg-blue-600 text-white px-4 rounded text-sm">Salvar</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs uppercase text-gray-500 mb-1">Valor Deslocamento (R$)</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="admin-displacement-price" class="p-2 rounded border dark:bg-dark-900 dark:border-gray-600 w-full">
+                                <button onclick="Admin.saveDisplacementPrice()" class="bg-orange-600 text-white px-4 rounded text-sm">Salvar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4 border-t border-gray-200 dark:border-gray-600 pt-4">
                         <span class="text-sm font-medium">Usar Preços Complexos (Por Empresa)?</span>
                         <button id="toggle-complex-price" onclick="Admin.toggleComplexPrice()" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors bg-gray-200">
                             <span class="transform transition ease-in-out duration-200 translate-x-1 inline-block w-4 h-4 rounded-full bg-white shadow"></span>
                         </button>
                     </div>
 
-                    <div id="simple-price-container" class="mb-4">
-                        <label class="block text-xs uppercase text-gray-500 mb-1">Preço Base Único (R$)</label>
-                        <div class="flex gap-2">
-                            <input type="number" id="admin-base-price" class="p-2 rounded border dark:bg-dark-900 dark:border-gray-600 w-32">
-                            <button onclick="Admin.saveBasePrice()" class="bg-blue-600 text-white px-4 rounded text-sm">Salvar</button>
-                        </div>
+                    <div id="simple-price-container" class="mb-4 text-xs text-gray-500 italic">
+                        * O sistema está usando o Preço Base Único para todas as empresas.
                     </div>
 
                     <div id="complex-price-container" class="hidden">
@@ -267,7 +284,6 @@
             { name: 'Outros', price: 220 }
         ];
 
-        // Usuários Obrigatórios (Sempre serão recriados se deletados)
         const PRESET_USERS = [
             { id: 'adm_master', name: 'Administrador Principal', phone: '', token: 'sJ0r@jt5', role: 'ADMIN' },
             { id: 'usr_david', name: 'David Lima', phone: '55 11 97605-1151', token: '123456', role: 'PROVIDER' },
@@ -288,14 +304,13 @@
                 technicians: [],
                 availability: [],
                 companies: DEFAULT_COMPANIES,
-                config: { basePrice: 220, complexPricing: false }
+                config: { basePrice: 220, complexPricing: false, displacementPrice: 100 }
             },
             currentUser: null
         };
 
         // --- DATABASE ---
         const DB = {
-            // Adiciona timestamp para impedir que o navegador use cache antigo
             loadData: async () => {
                 try {
                     const cacheBuster = `?t=${Date.now()}`;
@@ -311,25 +326,24 @@
                         state.data = { ...state.data, ...content };
                     }
 
-                    // Verifica e restaura usuários padrão se sumirem
+                    // Garante que a config nova exista (backward compatibility)
+                    if(state.data.config.displacementPrice === undefined) {
+                        state.data.config.displacementPrice = 100;
+                    }
+
                     return await DB.ensurePresetUsers();
                 } catch (e) {
                     console.error("Erro ao carregar.", e);
-                    // Se der erro (ex: offline), garante que pelo menos os presets existam na memória
                     DB.ensurePresetUsers(true); 
                     return false;
                 }
             },
 
-            // Garante que os usuários obrigatórios existam
             ensurePresetUsers: async (offlineMode = false) => {
                 let changed = false;
-                
-                // Se array de usuários não existir, cria
                 if(!state.data.users) state.data.users = [];
 
                 PRESET_USERS.forEach(preset => {
-                    // Busca se existe pelo Token (para evitar duplicatas)
                     const index = state.data.users.findIndex(u => u.token === preset.token);
                     if (index === -1) {
                         state.data.users.push(preset);
@@ -337,9 +351,8 @@
                     }
                 });
                 
-                // Se alterou algo e não estamos offline, salva imediatamente
                 if (changed && !offlineMode) {
-                    await DB.saveData(true); // true = silent mode
+                    await DB.saveData(true);
                 }
                 return true;
             },
@@ -347,7 +360,6 @@
             saveData: async (silent = false) => {
                 try {
                     if(!silent) View.toggleLoader(true, 'Salvando...');
-                    
                     await fetch(`https://api.github.com/gists/${CREDENTIALS.gistId}`, {
                         method: 'PATCH',
                         headers: { 
@@ -358,7 +370,6 @@
                             files: { 'database.json': { content: JSON.stringify(state.data) } }
                         })
                     });
-                    
                     if(!silent) {
                         View.toggleLoader(false);
                         View.toast('Dados sincronizados!', 'success');
@@ -376,7 +387,6 @@
         const Auth = {
             login: async (e) => {
                 if(e) e.preventDefault();
-                
                 const inputToken = document.getElementById('login-token').value.trim();
                 const statusDiv = document.getElementById('status-msg');
                 
@@ -384,26 +394,19 @@
 
                 View.toggleLoader(true, 'Verificando credenciais...');
                 statusDiv.innerText = "Sincronizando banco de dados...";
-
-                // FORÇA O CARREGAMENTO ANTES DE LOGAR
-                // Isso garante que se você acabou de criar o user, ele vai aparecer
                 await DB.loadData();
-
                 const user = state.data.users.find(u => u.token === inputToken);
-                
                 View.toggleLoader(false);
 
                 if (!user) {
-                    View.toast('Token inválido ou não encontrado.', 'error');
-                    statusDiv.innerText = "Token inválido. Tente novamente.";
+                    View.toast('Token inválido.', 'error');
+                    statusDiv.innerText = "Token inválido.";
                     return;
                 }
-
                 state.currentUser = user;
                 statusDiv.innerText = "";
                 View.startApp();
             },
-
             logout: () => {
                 state.currentUser = null;
                 document.getElementById('app-screen').classList.add('hidden');
@@ -424,11 +427,8 @@
                     token: f.token.value,
                     role: f.role.value
                 };
-                
                 if(state.data.users.find(u => u.token === newUser.token)) return View.toast('Token já existe!', 'error');
-
                 state.data.users.push(newUser);
-                // Salva e recarrega a lista
                 await DB.saveData();
                 View.renderAdminUsers();
                 f.reset();
@@ -436,9 +436,7 @@
             
             removeUser: async (id) => {
                 if(['adm_master'].includes(id)) return View.toast('Não pode remover o Admin Principal.', 'error');
-                
-                if(!confirm('Tem certeza? O usuário perderá o acesso imediatamente.')) return;
-                
+                if(!confirm('Tem certeza?')) return;
                 state.data.users = state.data.users.filter(u => u.id !== id);
                 await DB.saveData();
                 View.renderAdminUsers();
@@ -446,7 +444,7 @@
 
             toggleComplexPrice: () => {
                 state.data.config.complexPricing = !state.data.config.complexPricing;
-                DB.saveData(); // Save normal (com toast)
+                DB.saveData();
                 View.renderAdminSettings();
             },
 
@@ -454,6 +452,14 @@
                 const val = parseFloat(document.getElementById('admin-base-price').value);
                 if(val) {
                     state.data.config.basePrice = val;
+                    DB.saveData();
+                }
+            },
+
+            saveDisplacementPrice: () => {
+                const val = parseFloat(document.getElementById('admin-displacement-price').value);
+                if(val) {
+                    state.data.config.displacementPrice = val;
                     DB.saveData();
                 }
             },
@@ -479,6 +485,14 @@
 
         // --- APP LOGIC ---
         const App = {
+            refreshData: async () => {
+                View.toggleLoader(true, 'Atualizando...');
+                await DB.loadData();
+                View.renderDashboard();
+                View.toggleLoader(false);
+                View.toast('Dados atualizados!', 'success');
+            },
+
             createOS: (e) => {
                 e.preventDefault();
                 const f = e.target;
@@ -503,6 +517,7 @@
                     unit_price: unitPrice,
                     total: qty * unitPrice,
                     status: 'pendente',
+                    is_displacement: false,
                     created_by: state.currentUser.name,
                     created_at: new Date().toISOString(),
                     assigned_tech: null,
@@ -514,6 +529,43 @@
                 View.closeModal('modal-os');
                 View.renderDashboard();
                 f.reset();
+            },
+
+            deleteOS: (osId) => {
+                if(!confirm("Tem certeza que deseja EXCLUIR esta OS?")) return;
+                state.data.orders = state.data.orders.filter(o => o.id !== osId);
+                DB.saveData();
+                View.renderDashboard();
+            },
+
+            convertToDisplacement: (osId) => {
+                const os = state.data.orders.find(o => o.id === osId);
+                if(!os) return;
+
+                if(os.is_displacement) {
+                    // Reverter (opcional, por segurança)
+                    if(!confirm("Esta OS já é Deslocamento. Deseja reverter para cobrança normal?")) return;
+                    os.is_displacement = false;
+                    // Recalcula preço normal
+                    let unitPrice = state.data.config.basePrice;
+                    if(state.data.config.complexPricing) {
+                        const comp = state.data.companies.find(c => c.name === os.company);
+                        if(comp) unitPrice = comp.price;
+                    }
+                    os.unit_price = unitPrice;
+                    os.total = os.qty * unitPrice;
+                } else {
+                    // Converter
+                    const price = state.data.config.displacementPrice || 100;
+                    if(!confirm(`Converter para DESLOCAMENTO? \nO valor unitário mudará para R$ ${price.toFixed(2)}.`)) return;
+                    
+                    os.is_displacement = true;
+                    os.unit_price = price;
+                    os.total = os.qty * price;
+                }
+
+                DB.saveData();
+                View.renderDashboard();
             },
 
             addTechnician: (e) => {
@@ -567,7 +619,7 @@
                 if(idx >= 0) state.data.availability.splice(idx, 1);
                 else state.data.availability.push({ providerId, dateStr });
                 
-                DB.saveData(true); // Silent save
+                DB.saveData(true); 
                 View.renderCalendar();
             }
         };
@@ -595,7 +647,6 @@
                 document.getElementById('btn-admin-config').classList.add('hidden');
                 document.getElementById('financial-summary').classList.add('hidden');
 
-                // Aplica permissões
                 if (role === 'ADMIN' || role === 'ANALYST') document.getElementById('btn-create-os').classList.remove('hidden');
                 if (role === 'PROVIDER') document.getElementById('btn-tech-team').classList.remove('hidden');
                 if (role === 'ADMIN') {
@@ -643,6 +694,7 @@
                 const list = document.getElementById('os-list');
                 let orders = state.data.orders;
                 const role = state.currentUser.role;
+                const isAdminOrAnalyst = (role === 'ADMIN' || role === 'ANALYST');
 
                 if (role === 'PROVIDER') {
                     orders = orders.filter(o => o.status === 'pendente' || o.assigned_tech !== null);
@@ -660,12 +712,19 @@
                     let borderClass = isPending ? 'border-status-pending' : (isScheduled ? 'border-status-scheduled' : 'border-status-done');
                     let textClass = isPending ? 'text-status-pending' : (isScheduled ? 'text-status-scheduled' : 'text-status-done');
                     let statusLabel = isPending ? 'Pendente' : (isScheduled ? 'Agendada' : 'Concluída');
+                    
+                    if(os.is_displacement) {
+                        borderClass = 'border-status-displacement';
+                        textClass = 'text-status-displacement';
+                        statusLabel = 'Deslocamento';
+                    }
 
-                    let actionsHtml = '';
+                    // Ações principais (Agendar/Concluir)
+                    let mainActionsHtml = '';
                     if (role === 'PROVIDER' && isPending) {
                         const myTechs = state.data.technicians.filter(t => t.providerId === state.currentUser.id);
                         const options = myTechs.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
-                        actionsHtml = `
+                        mainActionsHtml = `
                             <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                                 <label class="text-xs font-bold block mb-1 text-gray-500">Aceitar e Agendar</label>
                                 <div class="flex flex-col gap-2">
@@ -680,17 +739,33 @@
                                 </div>
                             </div>`;
                     } else if ((role === 'PROVIDER' || role === 'ADMIN') && isScheduled) {
-                        actionsHtml = `
+                        mainActionsHtml = `
                              <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                                 <button onclick="App.concludeOS('${os.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold">Marcar como Concluída</button>
                              </div>`;
+                    }
+
+                    // Botões de Gestão (Excluir / Deslocamento) - Topo do Card
+                    let adminActions = '';
+                    if(isAdminOrAnalyst) {
+                        adminActions = `
+                            <div class="absolute top-4 right-4 flex gap-2">
+                                <button onclick="App.convertToDisplacement('${os.id}')" title="${os.is_displacement ? 'Reverter Deslocamento' : 'Converter em Deslocamento'}" class="w-6 h-6 rounded flex items-center justify-center ${os.is_displacement ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-600'} transition">
+                                    <i class="fas fa-car-side text-xs"></i>
+                                </button>
+                                <button onclick="App.deleteOS('${os.id}')" title="Excluir OS" class="w-6 h-6 rounded flex items-center justify-center bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-600 transition">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        `;
                     }
 
                     const showPrice = role === 'ADMIN';
 
                     return `
                         <div class="bg-white dark:bg-dark-800 rounded-lg shadow-lg border-l-4 ${borderClass} p-5 relative group hover:shadow-xl transition-all">
-                            <div class="flex justify-between items-start mb-2">
+                            ${adminActions}
+                            <div class="flex justify-between items-start mb-2 pr-12">
                                 <span class="bg-gray-100 dark:bg-dark-700 text-gray-500 text-xs px-2 py-1 rounded font-mono">#${os.code}</span>
                                 <span class="text-xs font-bold uppercase ${textClass} border border-current px-2 py-0.5 rounded-full">${statusLabel}</span>
                             </div>
@@ -698,7 +773,7 @@
                             <p class="text-xs text-gray-400 mb-3"><i class="fas fa-map-marker-alt"></i> ${os.address}</p>
                             <div class="grid grid-cols-2 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
                                 <div><span class="block text-[10px] uppercase text-gray-400">Elevadores</span> <strong>${os.qty}x (${os.company})</strong></div>
-                                ${showPrice ? `<div><span class="block text-[10px] uppercase text-gray-400">Total</span> <strong class="text-green-600">R$ ${os.total.toFixed(2)}</strong></div>` : ''}
+                                ${showPrice ? `<div><span class="block text-[10px] uppercase text-gray-400">Total</span> <strong class="${os.is_displacement ? 'text-orange-500' : 'text-green-600'}">R$ ${os.total.toFixed(2)}</strong></div>` : ''}
                                 <div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Técnico Local</span> ${os.tech_client}</div>
                                 ${os.contact ? `<div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Contato</span> <a href="https://wa.me/55${os.contact.replace(/\D/g,'')}" target="_blank" class="text-green-500 hover:underline"><i class="fab fa-whatsapp"></i> ${os.contact}</a></div>` : ''}
                             </div>
@@ -708,7 +783,7 @@
                                     <div class="text-xs text-gray-500">${new Date(os.scheduled_date).toLocaleString()}</div>
                                 </div>
                             ` : ''}
-                            ${actionsHtml}
+                            ${mainActionsHtml}
                         </div>`;
                 }).join('');
             },
@@ -753,6 +828,8 @@
 
             renderAdminSettings: () => {
                 document.getElementById('admin-base-price').value = state.data.config.basePrice;
+                document.getElementById('admin-displacement-price').value = state.data.config.displacementPrice;
+
                 const toggle = document.getElementById('toggle-complex-price');
                 const simpleContainer = document.getElementById('simple-price-container');
                 const complexContainer = document.getElementById('complex-price-container');
@@ -786,7 +863,6 @@
 
             renderAdminUsers: () => {
                 const uList = document.getElementById('admin-users-list');
-                // Ordena: Admin -> Analista -> Prestador
                 const sortedUsers = [...state.data.users].sort((a,b) => ROLE_LEVELS[b.role].level - ROLE_LEVELS[a.role].level);
 
                 uList.innerHTML = sortedUsers.map(u => {
@@ -838,7 +914,6 @@
         };
 
         // Inicia
-        // Se a pessoa abrir a página e for offline, pelo menos os users padrão funcionam
         DB.loadData();
 
     </script>
