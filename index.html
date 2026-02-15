@@ -20,14 +20,17 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .calendar-day { transition: all 0.2s; cursor: pointer; }
+        .calendar-day { transition: all 0.2s; cursor: pointer; min-height: 80px; }
         .calendar-day:hover { background-color: rgba(59, 130, 246, 0.1); }
-        /* A classe .active foi removida daqui pois será gerada dinamicamente via JS */
         #global-loader { backdrop-filter: blur(5px); }
         
         /* Scrollbar fina para a lista de online users */
         #online-users-list::-webkit-scrollbar { height: 4px; }
         #online-users-list::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+
+        /* Scrollbar fina para dentro do dia do calendario se tiver muita OS */
+        .day-content::-webkit-scrollbar { width: 2px; }
+        .day-content::-webkit-scrollbar-thumb { background: #cbd5e1; }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-dark-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col font-sans">
@@ -156,14 +159,21 @@
         <main id="tab-calendar" class="container mx-auto p-4 hidden flex-1">
             <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-6">
                 <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-bold">Disponibilidade da Equipe</h2>
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-xl font-bold" id="calendar-title">Janeiro 2026</h2>
+                        <div class="flex gap-1">
+                            <button onclick="App.changeMonth(-1)" class="bg-gray-100 dark:bg-dark-700 hover:bg-gray-200 dark:hover:bg-dark-600 text-gray-600 dark:text-gray-300 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fas fa-chevron-left"></i></button>
+                            <button onclick="App.changeMonth(1)" class="bg-gray-100 dark:bg-dark-700 hover:bg-gray-200 dark:hover:bg-dark-600 text-gray-600 dark:text-gray-300 w-8 h-8 rounded-full flex items-center justify-center transition"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                     
                     <div class="flex gap-2 items-center">
                         <button id="btn-clear-calendar" onclick="App.clearCalendar()" class="hidden text-xs text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded px-3 py-1 transition mr-2">
                             <i class="fas fa-trash"></i> Limpar Mês
                         </button>
-                        <div class="text-sm text-gray-500 flex items-center">
-                            <span class="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span> Disponível
+                        <div class="text-sm text-gray-500 flex items-center gap-2">
+                            <div class="flex items-center"><span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-1"></span> Disp.</div>
+                            <div class="flex items-center"><span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1"></span> OS</div>
                         </div>
                     </div>
                 </div>
@@ -324,7 +334,7 @@
 
         const DEFAULT_COMPANIES = [
             { name: 'Atlas', price: 220 },
-            { name: 'Thyssen / Tke / Tk', price: 220 },
+            { name: 'Thyssen', price: 220 },
             { name: 'Otis', price: 220 },
             { name: 'Outros', price: 220 }
         ];
@@ -342,6 +352,8 @@
             'TECH': { level: 3, label: 'Técnico' }
         };
 
+        const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
         let state = {
             data: {
                 users: [],
@@ -353,7 +365,11 @@
             },
             currentUser: null,
             filters: { text: '', start: '', end: '' }, // Novo: Estado dos filtros
-            selectedOS: new Set() // Novo: Estado da seleção múltipla
+            selectedOS: new Set(), // Novo: Estado da seleção múltipla
+            calendar: { // Novo: Estado do calendario
+                month: new Date().getMonth(),
+                year: new Date().getFullYear()
+            }
         };
 
         // --- UTILS ---
@@ -587,6 +603,7 @@
                     contact: f.contact.value,
                     company: companyName,
                     qty: qty,
+                    added_qty: 0, // Inicia com 0 adicionados
                     unit_price: unitPrice,
                     total: qty * unitPrice,
                     status: 'pendente',
@@ -626,14 +643,36 @@
                         if(comp) unitPrice = comp.price;
                     }
                     os.unit_price = unitPrice;
+                    // Volta a calcular por quantidade
                     os.total = os.qty * unitPrice;
                 } else {
                     const price = state.data.config.displacementPrice || 100;
-                    if(!confirm(`Converter para DESLOCAMENTO? Valor será R$ ${price.toFixed(2)}.`)) return;
+                    if(!confirm(`Converter para DESLOCAMENTO? Valor será R$ ${price.toFixed(2)} (Fixo).`)) return;
                     os.is_displacement = true;
                     os.unit_price = price;
-                    os.total = os.qty * price;
+                    // Fixa o valor total no preço do deslocamento, independente da quantidade
+                    os.total = price; 
                 }
+
+                DB.saveData();
+                View.renderDashboard();
+            },
+
+            addExtraElevator: (osId) => {
+                const os = state.data.orders.find(o => o.id === osId);
+                if(!os) return;
+                
+                if(os.is_displacement) {
+                    return View.toast('Não é possível adicionar elevadores em OS de Deslocamento.', 'warning');
+                }
+
+                if(!confirm('Adicionar +1 Elevador a esta OS?')) return;
+
+                os.qty = (os.qty || 0) + 1;
+                os.added_qty = (os.added_qty || 0) + 1;
+                
+                // Recalcula total (já que não é deslocamento)
+                os.total = os.qty * os.unit_price;
 
                 DB.saveData();
                 View.renderDashboard();
@@ -710,7 +749,10 @@
 
             toggleAvailability: (day) => {
                 if(state.currentUser.role !== 'PROVIDER' && state.currentUser.role !== 'TECH') return;
-                const dateStr = new Date().getFullYear() + '-' + (new Date().getMonth()+1).toString().padStart(2,'0') + '-' + day.toString().padStart(2,'0');
+                const year = state.calendar.year;
+                const month = (state.calendar.month + 1).toString().padStart(2, '0');
+                const dateStr = `${year}-${month}-${day.toString().padStart(2,'0')}`;
+                
                 const providerId = state.currentUser.id;
                 const idx = state.data.availability.findIndex(a => a.providerId === providerId && a.dateStr === dateStr);
                 
@@ -725,6 +767,18 @@
                 if(!confirm('Isso apagará TODAS as disponibilidades do calendário. Continuar?')) return;
                 state.data.availability = [];
                 DB.saveData();
+                View.renderCalendar();
+            },
+
+            changeMonth: (step) => {
+                let m = state.calendar.month + step;
+                let y = state.calendar.year;
+
+                if (m > 11) { m = 0; y++; }
+                else if (m < 0) { m = 11; y--; }
+
+                state.calendar.month = m;
+                state.calendar.year = y;
                 View.renderCalendar();
             }
         };
@@ -755,9 +809,13 @@
                 document.getElementById('btn-clear-calendar').classList.add('hidden');
                 document.getElementById('online-users-container').classList.add('hidden');
 
+                // Provider agora pode ver o painel financeiro também
+                if (role === 'ADMIN' || role === 'ANALYST' || role === 'PROVIDER') {
+                    document.getElementById('financial-panel').classList.remove('hidden');
+                }
+                
                 if (role === 'ADMIN' || role === 'ANALYST') {
                     document.getElementById('btn-create-os').classList.remove('hidden');
-                    document.getElementById('financial-panel').classList.remove('hidden');
                     document.getElementById('mass-actions').classList.remove('hidden');
                     document.getElementById('online-users-container').classList.remove('hidden');
                 }
@@ -832,6 +890,8 @@
 
                 const role = state.currentUser.role;
                 const isAdminOrAnalyst = (role === 'ADMIN' || role === 'ANALYST');
+                // Flag para saber se deve mostrar financeiro
+                const showFinancials = (isAdminOrAnalyst || role === 'PROVIDER');
 
                 // 2. Filtra Ordens
                 let orders = state.data.orders.filter(os => {
@@ -849,12 +909,17 @@
                     return true;
                 });
 
-                // 3. Calcula Financeiro (Se admin/analista)
-                if(shouldUpdateFinancials && isAdminOrAnalyst) {
+                // 3. Calcula Financeiro (Agora também para Provider)
+                if(shouldUpdateFinancials && showFinancials) {
                     const totalPending = orders.filter(o => o.payment_status === 'pendente').reduce((sum, o) => sum + o.total, 0);
                     const totalPaid = orders.filter(o => o.payment_status === 'pago').reduce((sum, o) => sum + o.total, 0);
                     const totalPeriod = orders.reduce((sum, o) => sum + o.total, 0);
-                    const totalAllTime = state.data.orders.reduce((sum, o) => sum + o.total, 0);
+                    const totalAllTime = state.data.orders.reduce((sum, o) => {
+                         // Se for provider, filtrar o total geral apenas das dele
+                         if(role === 'PROVIDER' && o.assigned_tech === null && o.status !== 'pendente') return sum; 
+                         // Simplificação: para provider o "total geral" aqui vai pegar tudo que ele tem acesso hoje via filtro "All Time"
+                         return sum + o.total;
+                    }, 0);
                     
                     let selectedTotal = 0;
                     state.selectedOS.forEach(id => {
@@ -865,7 +930,8 @@
                     document.getElementById('stat-pending').innerText = Utils.formatCurrency(totalPending);
                     document.getElementById('stat-paid').innerText = Utils.formatCurrency(totalPaid);
                     document.getElementById('stat-period').innerText = Utils.formatCurrency(totalPeriod);
-                    document.getElementById('stat-total').innerText = Utils.formatCurrency(totalAllTime);
+                    // Para admin mostra tudo, para provider o cálculo acima pode ser refinado mas aqui segue a lógica visual dos filtros atuais
+                    document.getElementById('stat-total').innerText = role === 'PROVIDER' ? Utils.formatCurrency(totalPeriod) : Utils.formatCurrency(totalAllTime);
                     document.getElementById('stat-selected').innerText = Utils.formatCurrency(selectedTotal);
                 }
 
@@ -891,6 +957,16 @@
                     if(payStatus === 'nota_lancada') payColor = 'bg-blue-100 text-blue-700';
 
                     const isChecked = state.selectedOS.has(os.id);
+
+                    // Tag de Elevadores Adicionados (Para Analista/Admin)
+                    const addedTag = (os.added_qty > 0 && (isAdminOrAnalyst)) 
+                        ? `<span class="ml-1 text-[10px] font-bold text-orange-500 bg-orange-100 px-1 rounded border border-orange-200">+${os.added_qty} Elev</span>`
+                        : '';
+
+                    // Botão para adicionar elevador (Apenas Provider e se não for deslocamento)
+                    const addElevBtn = (role === 'PROVIDER' && !os.is_displacement)
+                        ? `<button onclick="App.addExtraElevator('${os.id}')" title="Adicionar Elevador" class="ml-2 text-blue-600 hover:text-blue-800 bg-blue-50 px-1 rounded border border-blue-200 text-xs font-bold">+</button>`
+                        : '';
 
                     // Ações de Agendamento
                     let schedulingHtml = '';
@@ -973,7 +1049,12 @@
                             <p class="text-xs text-gray-400 mb-3 truncate"><i class="fas fa-map-marker-alt"></i> ${os.address}</p>
                             
                             <div class="grid grid-cols-2 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
-                                <div><span class="block text-[10px] uppercase text-gray-400">Elevadores</span> <strong>${os.qty}x (${os.company})</strong></div>
+                                <div class="flex items-center">
+                                    <span class="block text-[10px] uppercase text-gray-400 mr-2">Elevadores</span> 
+                                    <strong>${os.qty}x (${os.company})</strong>
+                                    ${addElevBtn}
+                                    ${addedTag}
+                                </div>
                                 ${(isAdminOrAnalyst || role === 'PROVIDER') ? `<div><span class="block text-[10px] uppercase text-gray-400">Total</span> <strong class="${os.is_displacement ? 'text-orange-500' : 'text-green-600'}">R$ ${os.total.toFixed(2)}</strong></div>` : ''}
                                 <div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Técnico Local</span> ${os.tech_client}</div>
                                 ${os.contact ? `<div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Contato</span> <a href="https://wa.me/55${os.contact.replace(/\D/g,'')}" target="_blank" class="text-green-500 hover:underline"><i class="fab fa-whatsapp"></i> ${os.contact}</a></div>` : ''}
@@ -995,57 +1076,104 @@
             renderCalendar: () => {
                 const grid = document.getElementById('calendar-grid');
                 const list = document.getElementById('calendar-availability-list');
+                const title = document.getElementById('calendar-title');
+                
                 grid.innerHTML = '';
                 list.innerHTML = '';
 
-                const today = new Date();
-                const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-                const currentMonthStr = (today.getMonth()+1).toString().padStart(2,'0');
+                // Datas do calendário baseado no estado
+                const currentMonth = state.calendar.month;
+                const currentYear = state.calendar.year;
                 
+                title.innerText = `${MONTH_NAMES[currentMonth]} ${currentYear}`;
+
+                const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+                const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                const currentMonthStr = (currentMonth+1).toString().padStart(2,'0');
+                
+                // Preenchimento dos dias vazios
+                for(let i=0; i<firstDay; i++) {
+                    const empty = document.createElement('div');
+                    empty.className = 'bg-transparent';
+                    grid.appendChild(empty);
+                }
+
                 for(let i=1; i<=daysInMonth; i++) {
                     const dayStr = i.toString().padStart(2,'0');
-                    const fullDate = `${today.getFullYear()}-${currentMonthStr}-${dayStr}`;
+                    const fullDate = `${currentYear}-${currentMonthStr}-${dayStr}`;
                     
                     const availabilities = state.data.availability.filter(a => a.dateStr === fullDate);
                     const isMe = state.currentUser ? availabilities.some(a => a.providerId === state.currentUser.id) : false;
                     
+                    // Busca Ordens Agendadas neste dia
+                    const dailyOrders = state.data.orders.filter(o => {
+                        if(!o.scheduled_date) return false;
+                        const dateOnly = o.scheduled_date.split('T')[0];
+                        return dateOnly === fullDate;
+                    });
+
                     // Estilização Dinâmica
                     let bgStyle = 'bg-gray-50 dark:bg-dark-700';
                     
-                    // Se eu sou provider e marquei: BRANCO (para destaque)
                     if(isMe && state.currentUser.role === 'PROVIDER') {
-                        bgStyle = 'bg-white border-2 border-green-500 text-green-600 shadow-md transform scale-105 z-10';
+                        bgStyle = 'bg-white border-2 border-green-500 shadow-md transform scale-[1.02] z-10';
                     } else if (availabilities.length > 0) {
-                        // Se outros marcaram: Cor dinâmica suave
                         bgStyle = 'bg-gray-100 dark:bg-dark-600';
                     }
 
                     const div = document.createElement('div');
-                    div.className = `calendar-day h-16 rounded border dark:border-gray-600 flex flex-col items-center justify-center font-bold text-gray-400 relative overflow-hidden ${bgStyle}`;
-                    div.onclick = () => App.toggleAvailability(i);
+                    div.className = `calendar-day rounded border dark:border-gray-600 flex flex-col items-center justify-start p-1 relative overflow-hidden ${bgStyle}`;
+                    div.onclick = (e) => {
+                        // Evita abrir modal se clicar na tag da OS (futuro)
+                        if(e.target.tagName !== 'SPAN') App.toggleAvailability(i);
+                    };
                     
-                    // Pontos coloridos para cada user
-                    const dots = document.createElement('div');
-                    dots.className = 'flex gap-1 mt-1 flex-wrap justify-center px-1';
-                    availabilities.forEach(a => {
-                        const u = state.data.users.find(x => x.id === a.providerId);
-                        if(u) {
-                            const dot = document.createElement('div');
-                            dot.className = 'w-2 h-2 rounded-full';
-                            dot.style.backgroundColor = Utils.generateColor(u.name);
-                            dot.title = u.name;
-                            dots.appendChild(dot);
-                        }
-                    });
+                    // Número do Dia
+                    div.innerHTML = `<span class="text-xs font-bold text-gray-500 mb-1 z-0">${i}</span>`;
+                    
+                    // Container para conteúdo do dia
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'flex flex-col gap-1 w-full items-center overflow-y-auto day-content max-h-[60px]';
 
-                    div.innerHTML = `<span class="z-10 text-sm">${i}</span>`;
-                    div.appendChild(dots);
+                    // Pontos de Disponibilidade
+                    if (availabilities.length > 0) {
+                        const dots = document.createElement('div');
+                        dots.className = 'flex gap-1 flex-wrap justify-center px-1 mb-1';
+                        availabilities.forEach(a => {
+                            const u = state.data.users.find(x => x.id === a.providerId);
+                            if(u) {
+                                const dot = document.createElement('div');
+                                dot.className = 'w-1.5 h-1.5 rounded-full';
+                                dot.style.backgroundColor = Utils.generateColor(u.name);
+                                dot.title = u.name;
+                                dots.appendChild(dot);
+                            }
+                        });
+                        contentDiv.appendChild(dots);
+                    }
+
+                    // Tags de OS
+                    if (dailyOrders.length > 0) {
+                        dailyOrders.forEach(o => {
+                            const osTag = document.createElement('span');
+                            const colorClass = o.status === 'concluida' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-blue-100 text-blue-700 border-blue-200';
+                            osTag.className = `text-[9px] px-1 rounded border w-full text-center truncate ${colorClass}`;
+                            osTag.innerText = `#${o.code}`;
+                            osTag.title = `${o.name} - ${o.assigned_tech}`;
+                            contentDiv.appendChild(osTag);
+                        });
+                    }
+
+                    div.appendChild(contentDiv);
                     grid.appendChild(div);
                 }
 
-                // Legenda de Cores
+                // Legenda de Cores (Disponibilidade)
                 const availableMap = {};
                 state.data.availability.forEach(a => {
+                    // Filtra apenas para o mês exibido
+                    if (!a.dateStr.startsWith(`${currentYear}-${currentMonthStr}`)) return;
+
                     const provider = state.data.users.find(u => u.id === a.providerId);
                     if(provider) {
                         if(!availableMap[provider.name]) availableMap[provider.name] = [];
@@ -1063,7 +1191,7 @@
                             <span class="text-xs">Dias ${days.sort((a,b)=>a-b).join(', ')}</span>
                         </li>`;
                 }
-                list.innerHTML = html || '<span class="text-gray-400 italic">Nenhuma disponibilidade marcada ainda.</span>';
+                list.innerHTML = html || '<span class="text-gray-400 italic">Nenhuma disponibilidade marcada neste mês.</span>';
             },
 
             renderAdminSettings: () => {
@@ -1158,4 +1286,3 @@
     </script>
 </body>
 </html>
-
