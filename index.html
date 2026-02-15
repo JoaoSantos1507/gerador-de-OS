@@ -384,36 +384,46 @@
         };
 
         // --- DATABASE ---
+       // --- DATABASE SEGURO (VIA API VERCEL) ---
         const DB = {
+            // URL da API que criamos (o caminho relativo funciona automático na Vercel)
+            endpoint: '/api/gist',
+
             loadData: async () => {
                 try {
-                    const cacheBuster = `?t=${Date.now()}`;
-                    const res = await fetch(`https://api.github.com/gists/${CREDENTIALS.gistId}${cacheBuster}`, {
-                        headers: { 'Authorization': `token ${CREDENTIALS.token}` }
-                    });
+                    // Chama nossa API em vez de ir direto no GitHub
+                    const res = await fetch(DB.endpoint);
                     
-                    if (!res.ok) throw new Error('Falha na conexão');
+                    if (!res.ok) throw new Error('Falha ao conectar com o servidor.');
+                    
                     const json = await res.json();
                     
+                    // A estrutura do Gist retorna: { files: { 'database.json': { content: "..." } } }
                     if(json.files && json.files['database.json']) {
                         const content = JSON.parse(json.files['database.json'].content);
-                        state.data = { ...state.data, ...content };
+                        
+                        // Merge seguro dos dados
+                        state.data = { 
+                            ...state.data, 
+                            ...content,
+                            users: content.users || [],
+                            orders: content.orders || [],
+                            technicians: content.technicians || [],
+                            availability: content.availability || []
+                        };
                     }
 
-                    // Migração: Garante que configs existam
+                    // Migrações e Atualizações locais
                     if(state.data.config.displacementPrice === undefined) state.data.config.displacementPrice = 100;
-
-                    // Atualiza Last Seen se estiver logado
                     if(state.currentUser) {
                         const me = state.data.users.find(u => u.id === state.currentUser.id);
-                        if(me) {
-                            me.last_seen = Date.now();
-                        }
+                        if(me) me.last_seen = Date.now();
                     }
 
                     return await DB.ensurePresetUsers();
                 } catch (e) {
-                    console.error("Erro ao carregar.", e);
+                    console.error("Erro no DB:", e);
+                    View.toast('Modo Offline: Não foi possível sincronizar.', 'warning');
                     DB.ensurePresetUsers(true); 
                     return false;
                 }
@@ -426,7 +436,7 @@
                 PRESET_USERS.forEach(preset => {
                     const index = state.data.users.findIndex(u => u.token === preset.token);
                     if (index === -1) {
-                        state.data.users.push({ ...preset, last_seen: 0 }); // Add last_seen default
+                        state.data.users.push({ ...preset, last_seen: 0 });
                         changed = true;
                     }
                 });
@@ -441,31 +451,32 @@
                 try {
                     if(!silent) View.toggleLoader(true, 'Salvando...');
                     
-                    // Atualiza Last Seen ao salvar também
                     if(state.currentUser) {
                         const me = state.data.users.find(u => u.id === state.currentUser.id);
                         if(me) me.last_seen = Date.now();
                     }
 
-                    await fetch(`https://api.github.com/gists/${CREDENTIALS.gistId}`, {
-                        method: 'PATCH',
-                        headers: { 
-                            'Authorization': `token ${CREDENTIALS.token}`,
-                            'Content-Type': 'application/json'
-                        },
+                    // Envia para nossa API (POST)
+                    const res = await fetch(DB.endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             files: { 'database.json': { content: JSON.stringify(state.data) } }
                         })
                     });
+
+                    if (!res.ok) throw new Error("Erro ao salvar.");
+
                     if(!silent) {
                         View.toggleLoader(false);
-                        View.toast('Dados sincronizados!', 'success');
+                        View.toast('Dados sincronizados com sucesso!', 'success');
                     }
                 } catch (e) {
                     if(!silent) {
                         View.toggleLoader(false);
-                        View.toast('Erro ao salvar no servidor.', 'error');
+                        View.toast(`FALHA AO SALVAR: ${e.message}`, 'error');
                     }
+                    console.error(e);
                 }
             }
         };
@@ -1286,3 +1297,4 @@
     </script>
 </body>
 </html>
+
