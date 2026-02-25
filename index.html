@@ -19,6 +19,10 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <style>
         .calendar-day { transition: all 0.2s; cursor: pointer; min-height: 80px; }
         .calendar-day:hover { background-color: rgba(59, 130, 246, 0.1); }
@@ -31,6 +35,11 @@
         /* Scrollbar fina para dentro do dia do calendario se tiver muita OS */
         .day-content::-webkit-scrollbar { width: 2px; }
         .day-content::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+        /* Filtro Dark Mode para o Mapa Leaflet */
+        .dark .leaflet-layer {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-dark-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col font-sans">
@@ -70,6 +79,7 @@
                 <div class="hidden md:flex bg-gray-100 dark:bg-dark-700 rounded-lg p-1 ml-4">
                     <button onclick="View.switchTab('dashboard')" id="tab-btn-dashboard" class="px-4 py-1 rounded-md text-sm font-medium transition-colors bg-white dark:bg-dark-600 shadow text-blue-600">OS</button>
                     <button onclick="View.switchTab('calendar')" id="tab-btn-calendar" class="px-4 py-1 rounded-md text-sm font-medium transition-colors text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Calendário</button>
+                    <button onclick="View.switchTab('map')" id="tab-btn-map" class="px-4 py-1 rounded-md text-sm font-medium transition-colors text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Mapa</button>
                 </div>
             </div>
 
@@ -97,6 +107,7 @@
         <div class="md:hidden bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-gray-700 flex justify-around p-2">
             <button onclick="View.switchTab('dashboard')" class="flex-1 text-center py-2 text-blue-600 font-bold text-sm">Ordens</button>
             <button onclick="View.switchTab('calendar')" class="flex-1 text-center py-2 text-gray-500 font-bold text-sm">Agenda</button>
+            <button onclick="View.switchTab('map')" class="flex-1 text-center py-2 text-gray-500 font-bold text-sm">Mapa</button>
         </div>
 
         <main id="tab-dashboard" class="container mx-auto p-4 flex-1">
@@ -138,10 +149,16 @@
                         <input type="text" id="filter-search" oninput="View.renderDashboard()" placeholder="Local ou Cód..." class="bg-transparent border-none text-sm p-2 focus:ring-0 w-full md:w-40 text-gray-700 dark:text-gray-200">
                     </div>
                     
-                    <div class="flex items-center gap-1">
-                        <input type="date" id="filter-start" onchange="View.renderDashboard()" class="bg-gray-100 dark:bg-dark-700 border dark:border-gray-600 text-sm p-2 rounded-lg w-32 text-gray-700 dark:text-gray-200">
-                        <span class="text-gray-400">-</span>
-                        <input type="date" id="filter-end" onchange="View.renderDashboard()" class="bg-gray-100 dark:bg-dark-700 border dark:border-gray-600 text-sm p-2 rounded-lg w-32 text-gray-700 dark:text-gray-200">
+                    <div class="flex flex-wrap items-center gap-2">
+                         <div class="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 p-1 rounded-lg border border-blue-100 dark:border-blue-800" title="Data Exata">
+                            <i class="fas fa-calendar-day text-blue-500 ml-2 text-xs"></i>
+                            <input type="date" id="filter-exact" onchange="View.renderDashboard()" class="bg-transparent border-none text-sm p-1 rounded w-32 text-gray-700 dark:text-gray-200 focus:ring-0">
+                         </div>
+                         <div class="flex items-center gap-1">
+                            <input type="date" id="filter-start" onchange="View.renderDashboard()" class="bg-gray-100 dark:bg-dark-700 border dark:border-gray-600 text-sm p-2 rounded-lg w-32 text-gray-700 dark:text-gray-200">
+                            <span class="text-gray-400">-</span>
+                            <input type="date" id="filter-end" onchange="View.renderDashboard()" class="bg-gray-100 dark:bg-dark-700 border dark:border-gray-600 text-sm p-2 rounded-lg w-32 text-gray-700 dark:text-gray-200">
+                         </div>
                     </div>
                 </div>
 
@@ -153,7 +170,7 @@
             </div>
 
             <div id="os-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                </div>
+            </div>
         </main>
 
         <main id="tab-calendar" class="container mx-auto p-4 hidden flex-1">
@@ -182,13 +199,20 @@
                     <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
                 </div>
                 <div id="calendar-grid" class="grid grid-cols-7 gap-2">
-                    </div>
+                </div>
 
                 <div id="calendar-legend" class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <h4 class="font-bold text-sm mb-2">Quem está disponível este mês:</h4>
                     <ul id="calendar-availability-list" class="text-sm space-y-1 text-gray-600 dark:text-gray-400">
-                        </ul>
+                    </ul>
                 </div>
+            </div>
+        </main>
+
+        <main id="tab-map" class="container mx-auto p-4 hidden flex-1 relative min-h-[500px]">
+            <div class="bg-white dark:bg-dark-800 rounded-xl shadow p-2 w-full h-full flex flex-col min-h-[600px]">
+                <h2 class="text-xl font-bold mb-2 px-4 pt-2 text-gray-800 dark:text-white">Mapa de OS</h2>
+                <div id="map-container" class="flex-1 w-full rounded-lg shadow z-10 relative"></div>
             </div>
         </main>
     </section>
@@ -326,6 +350,9 @@
     </div>
 
     <script>
+        // --- VARIÁVEIS DO MAPA ---
+        let leafletMap = null;
+
         // --- CONFIGURAÇÃO E DADOS ---
         const CREDENTIALS = {
             gistId: 'f28dc1c2c0874c8d7329deaa09aa6606',
@@ -364,9 +391,10 @@
                 config: { basePrice: 220, complexPricing: false, displacementPrice: 100 }
             },
             currentUser: null,
-            filters: { text: '', start: '', end: '' }, // Novo: Estado dos filtros
-            selectedOS: new Set(), // Novo: Estado da seleção múltipla
-            calendar: { // Novo: Estado do calendario
+            filters: { text: '', start: '', end: '', exact: '' }, 
+            selectedOS: new Set(), 
+            editingTech: new Set(), // Estado para o botão de editar técnico
+            calendar: { 
                 month: new Date().getMonth(),
                 year: new Date().getFullYear()
             }
@@ -383,26 +411,21 @@
             formatCurrency: (val) => val.toLocaleString('pt-BR', { style:'currency', currency:'BRL' })
         };
 
-        // --- DATABASE ---
-       // --- DATABASE SEGURO (VIA API VERCEL) ---
+        // --- DATABASE SEGURO (VIA API VERCEL) ---
         const DB = {
-            // URL da API que criamos (o caminho relativo funciona automático na Vercel)
             endpoint: '/api/gist',
 
             loadData: async () => {
                 try {
-                    // Chama nossa API em vez de ir direto no GitHub
                     const res = await fetch(DB.endpoint);
                     
                     if (!res.ok) throw new Error('Falha ao conectar com o servidor.');
                     
                     const json = await res.json();
                     
-                    // A estrutura do Gist retorna: { files: { 'database.json': { content: "..." } } }
                     if(json.files && json.files['database.json']) {
                         const content = JSON.parse(json.files['database.json'].content);
                         
-                        // Merge seguro dos dados
                         state.data = { 
                             ...state.data, 
                             ...content,
@@ -413,7 +436,6 @@
                         };
                     }
 
-                    // Migrações e Atualizações locais
                     if(state.data.config.displacementPrice === undefined) state.data.config.displacementPrice = 100;
                     if(state.currentUser) {
                         const me = state.data.users.find(u => u.id === state.currentUser.id);
@@ -456,7 +478,6 @@
                         if(me) me.last_seen = Date.now();
                     }
 
-                    // Envia para nossa API (POST)
                     const res = await fetch(DB.endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -589,6 +610,7 @@
                 await DB.loadData();
                 View.renderDashboard(); 
                 View.renderOnlineUsers();
+                if(!document.getElementById('tab-map').classList.contains('hidden')) View.renderMap();
                 View.toggleLoader(false);
                 View.toast('Dados atualizados!', 'success');
             },
@@ -614,16 +636,17 @@
                     contact: f.contact.value,
                     company: companyName,
                     qty: qty,
-                    added_qty: 0, // Inicia com 0 adicionados
+                    added_qty: 0, 
                     unit_price: unitPrice,
                     total: qty * unitPrice,
                     status: 'pendente',
-                    payment_status: 'pendente', // Novo campo
+                    payment_status: 'pendente',
                     is_displacement: false,
                     created_by: state.currentUser.name,
                     created_at: new Date().toISOString(),
                     assigned_tech: null,
-                    scheduled_date: null
+                    scheduled_date: null,
+                    // Deixamos lat/lng vazios para o Leaflet preencher
                 };
 
                 state.data.orders.push(newOS);
@@ -636,7 +659,7 @@
             deleteOS: (osId) => {
                 if(!confirm("Tem certeza que deseja EXCLUIR esta OS?")) return;
                 state.data.orders = state.data.orders.filter(o => o.id !== osId);
-                state.selectedOS.delete(osId); // Limpa seleção
+                state.selectedOS.delete(osId); 
                 DB.saveData();
                 View.renderDashboard();
             },
@@ -654,14 +677,12 @@
                         if(comp) unitPrice = comp.price;
                     }
                     os.unit_price = unitPrice;
-                    // Volta a calcular por quantidade
                     os.total = os.qty * unitPrice;
                 } else {
                     const price = state.data.config.displacementPrice || 100;
                     if(!confirm(`Converter para DESLOCAMENTO? Valor será R$ ${price.toFixed(2)} (Fixo).`)) return;
                     os.is_displacement = true;
                     os.unit_price = price;
-                    // Fixa o valor total no preço do deslocamento, independente da quantidade
                     os.total = price; 
                 }
 
@@ -673,16 +694,11 @@
                 const os = state.data.orders.find(o => o.id === osId);
                 if(!os) return;
                 
-                if(os.is_displacement) {
-                    return View.toast('Não é possível adicionar elevadores em OS de Deslocamento.', 'warning');
-                }
-
+                if(os.is_displacement) return View.toast('Não é possível adicionar elevadores em OS de Deslocamento.', 'warning');
                 if(!confirm('Adicionar +1 Elevador a esta OS?')) return;
 
                 os.qty = (os.qty || 0) + 1;
                 os.added_qty = (os.added_qty || 0) + 1;
-                
-                // Recalcula total (já que não é deslocamento)
                 os.total = os.qty * os.unit_price;
 
                 DB.saveData();
@@ -743,7 +759,7 @@
             toggleSelectOS: (osId) => {
                 if(state.selectedOS.has(osId)) state.selectedOS.delete(osId);
                 else state.selectedOS.add(osId);
-                View.renderDashboard(false); // False evita recalcular tudo se não necessário (mas aqui recalc para somas)
+                View.renderDashboard(false);
             },
 
             markSelectedPaid: () => {
@@ -791,6 +807,22 @@
                 state.calendar.month = m;
                 state.calendar.year = y;
                 View.renderCalendar();
+            },
+            
+            // Novas funções pedidas:
+            toggleEditTech: (osId) => {
+                if(state.editingTech.has(osId)) state.editingTech.delete(osId);
+                else state.editingTech.add(osId);
+                View.renderDashboard(false);
+            },
+
+            copyAddress: async (address) => {
+                try {
+                    await navigator.clipboard.writeText(address);
+                    View.toast('Endereço copiado!', 'success');
+                } catch (e) {
+                    View.toast('Erro ao copiar o endereço.', 'error');
+                }
             }
         };
 
@@ -811,7 +843,6 @@
                 const role = state.currentUser.role;
                 document.getElementById('user-role-badge').innerText = ROLE_LEVELS[role].label;
 
-                // Reset UI Permissions
                 document.getElementById('btn-create-os').classList.add('hidden');
                 document.getElementById('btn-tech-team').classList.add('hidden');
                 document.getElementById('btn-admin-config').classList.add('hidden');
@@ -820,7 +851,6 @@
                 document.getElementById('btn-clear-calendar').classList.add('hidden');
                 document.getElementById('online-users-container').classList.add('hidden');
 
-                // Provider agora pode ver o painel financeiro também
                 if (role === 'ADMIN' || role === 'ANALYST' || role === 'PROVIDER') {
                     document.getElementById('financial-panel').classList.remove('hidden');
                 }
@@ -840,30 +870,29 @@
                 View.renderTechTeam();
                 View.renderOnlineUsers();
                 
-                // Atualiza lista de online users periodicamente
                 setInterval(View.renderOnlineUsers, 60000); 
             },
 
             switchTab: (tabName) => {
-                document.getElementById('tab-dashboard').classList.add('hidden');
-                document.getElementById('tab-calendar').classList.add('hidden');
-                document.getElementById('tab-btn-dashboard')?.classList.remove('bg-white', 'shadow', 'text-blue-600');
-                document.getElementById('tab-btn-calendar')?.classList.remove('bg-white', 'shadow', 'text-blue-600');
+                // Atualizamos para cobrir a nova aba 'map' no loop dinâmico
+                ['dashboard', 'calendar', 'map'].forEach(tab => {
+                    document.getElementById(`tab-${tab}`)?.classList.add('hidden');
+                    document.getElementById(`tab-btn-${tab}`)?.classList.remove('bg-white', 'shadow', 'text-blue-600');
+                });
 
-                document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+                document.getElementById(`tab-${tabName}`)?.classList.remove('hidden');
                 document.getElementById(`tab-btn-${tabName}`)?.classList.add('bg-white', 'shadow', 'text-blue-600');
 
                 if(tabName === 'dashboard') View.renderDashboard();
                 if(tabName === 'calendar') View.renderCalendar();
+                if(tabName === 'map') View.renderMap();
             },
 
             renderOnlineUsers: () => {
                 const container = document.getElementById('online-users-list');
-                // Apenas Admin vê online users
                 if(state.currentUser.role !== 'ADMIN' && state.currentUser.role !== 'ANALYST') return;
                 
                 const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-                // Filtra quem teve last_seen recente
                 const online = state.data.users.filter(u => u.last_seen > tenMinutesAgo);
                 
                 container.innerHTML = online.map(u => `
@@ -890,7 +919,6 @@
                 document.getElementById('os-preview-total').innerText = `R$ ${(qty * price).toFixed(2)}`;
             },
 
-            // --- Lógica Principal do Dashboard ---
             renderDashboard: (shouldUpdateFinancials = true) => {
                 const list = document.getElementById('os-list');
                 
@@ -898,10 +926,10 @@
                 state.filters.text = document.getElementById('filter-search').value.toLowerCase();
                 state.filters.start = document.getElementById('filter-start').value;
                 state.filters.end = document.getElementById('filter-end').value;
+                state.filters.exact = document.getElementById('filter-exact')?.value || '';
 
                 const role = state.currentUser.role;
                 const isAdminOrAnalyst = (role === 'ADMIN' || role === 'ANALYST');
-                // Flag para saber se deve mostrar financeiro
                 const showFinancials = (isAdminOrAnalyst || role === 'PROVIDER');
 
                 // 2. Filtra Ordens
@@ -914,21 +942,28 @@
                 }).filter(os => {
                     // Filtros de UI
                     if (state.filters.text && !os.name.toLowerCase().includes(state.filters.text) && !os.code.includes(state.filters.text)) return false;
+                    
                     const osDate = os.created_at.split('T')[0];
-                    if (state.filters.start && osDate < state.filters.start) return false;
-                    if (state.filters.end && osDate > state.filters.end) return false;
+                    const schedDate = os.scheduled_date ? os.scheduled_date.split('T')[0] : '';
+                    
+                    // Prioriza Filtro de Data Exata
+                    if (state.filters.exact) {
+                        if (osDate !== state.filters.exact && schedDate !== state.filters.exact) return false;
+                    } else {
+                        if (state.filters.start && osDate < state.filters.start) return false;
+                        if (state.filters.end && osDate > state.filters.end) return false;
+                    }
+
                     return true;
                 });
 
-                // 3. Calcula Financeiro (Agora também para Provider)
+                // 3. Calcula Financeiro
                 if(shouldUpdateFinancials && showFinancials) {
                     const totalPending = orders.filter(o => o.payment_status === 'pendente').reduce((sum, o) => sum + o.total, 0);
                     const totalPaid = orders.filter(o => o.payment_status === 'pago').reduce((sum, o) => sum + o.total, 0);
                     const totalPeriod = orders.reduce((sum, o) => sum + o.total, 0);
                     const totalAllTime = state.data.orders.reduce((sum, o) => {
-                         // Se for provider, filtrar o total geral apenas das dele
                          if(role === 'PROVIDER' && o.assigned_tech === null && o.status !== 'pendente') return sum; 
-                         // Simplificação: para provider o "total geral" aqui vai pegar tudo que ele tem acesso hoje via filtro "All Time"
                          return sum + o.total;
                     }, 0);
                     
@@ -941,7 +976,6 @@
                     document.getElementById('stat-pending').innerText = Utils.formatCurrency(totalPending);
                     document.getElementById('stat-paid').innerText = Utils.formatCurrency(totalPaid);
                     document.getElementById('stat-period').innerText = Utils.formatCurrency(totalPeriod);
-                    // Para admin mostra tudo, para provider o cálculo acima pode ser refinado mas aqui segue a lógica visual dos filtros atuais
                     document.getElementById('stat-total').innerText = role === 'PROVIDER' ? Utils.formatCurrency(totalPeriod) : Utils.formatCurrency(totalAllTime);
                     document.getElementById('stat-selected').innerText = Utils.formatCurrency(selectedTotal);
                 }
@@ -951,7 +985,6 @@
                     const isPending = os.status === 'pendente';
                     const isScheduled = os.status === 'agendada';
                     
-                    // Estilos de Status de Execução
                     let borderClass = isPending ? 'border-status-pending' : (isScheduled ? 'border-status-scheduled' : 'border-status-done');
                     let textClass = isPending ? 'text-status-pending' : (isScheduled ? 'text-status-scheduled' : 'text-status-done');
                     let statusLabel = isPending ? 'Pendente' : (isScheduled ? 'Agendada' : 'Concluída');
@@ -962,39 +995,74 @@
                         statusLabel = 'Deslocamento';
                     }
 
-                    // Estilos de Status de Pagamento
                     const payStatus = os.payment_status || 'pendente';
                     let payColor = payStatus === 'pago' ? 'bg-green-100 text-green-700' : (payStatus === 'atrasado' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700');
                     if(payStatus === 'nota_lancada') payColor = 'bg-blue-100 text-blue-700';
 
                     const isChecked = state.selectedOS.has(os.id);
 
-                    // Tag de Elevadores Adicionados (Para Analista/Admin)
                     const addedTag = (os.added_qty > 0 && (isAdminOrAnalyst)) 
                         ? `<span class="ml-1 text-[10px] font-bold text-orange-500 bg-orange-100 px-1 rounded border border-orange-200">+${os.added_qty} Elev</span>`
                         : '';
 
-                    // Botão para adicionar elevador (Apenas Provider e se não for deslocamento)
                     const addElevBtn = (role === 'PROVIDER' && !os.is_displacement)
                         ? `<button onclick="App.addExtraElevator('${os.id}')" title="Adicionar Elevador" class="ml-2 text-blue-600 hover:text-blue-800 bg-blue-50 px-1 rounded border border-blue-200 text-xs font-bold">+</button>`
                         : '';
 
-                    // Ações de Agendamento
+                    // Lógica Melhorada de Agendamento (Com botão de Edição)
                     let schedulingHtml = '';
-                    if (role === 'PROVIDER' && isPending) {
+                    const isEditingTech = state.editingTech.has(os.id);
+                    const canEditTech = (role === 'PROVIDER' || isAdminOrAnalyst);
+
+                    if (os.assigned_tech) {
+                        if (isEditingTech && canEditTech) {
+                            let availableTechs = state.data.technicians;
+                            if(role === 'PROVIDER') availableTechs = availableTechs.filter(t => t.providerId === state.currentUser.id);
+                            const options = availableTechs.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+                            
+                            schedulingHtml += `
+                            <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="text-xs font-bold block text-gray-500">Reagendar Técnico</label>
+                                    <button onclick="App.toggleEditTech('${os.id}')" class="text-[10px] text-red-500 hover:text-red-700 font-bold uppercase">Cancelar</button>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <select id="tech-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">${options || '<option>Cadastre técnicos...</option>'}</select>
+                                    <input type="datetime-local" id="date-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600 dark:[&::-webkit-calendar-picker-indicator]:invert">
+                                    <button onclick="(() => {
+                                        const t = document.getElementById('tech-${os.id}').value;
+                                        const d = document.getElementById('date-${os.id}').value;
+                                        if(t && d) { App.assignOS('${os.id}', t, d); App.toggleEditTech('${os.id}'); }
+                                        else View.toast('Informe técnico e data', 'warning');
+                                    })()" class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold shadow">Atualizar Agendamento</button>
+                                </div>
+                            </div>`;
+                        } else {
+                            schedulingHtml += `
+                            <div class="mt-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 p-2 rounded flex justify-between items-center">
+                                <div>
+                                    <div class="text-xs text-green-700 dark:text-green-400 font-bold"><i class="fas fa-user-check"></i> ${os.assigned_tech}</div>
+                                    <div class="text-xs text-gray-500">${new Date(os.scheduled_date).toLocaleString()}</div>
+                                </div>
+                                ${canEditTech ? `<button onclick="App.toggleEditTech('${os.id}')" class="text-[10px] bg-white dark:bg-dark-700 border border-gray-300 dark:border-gray-600 px-2 py-1 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-100 transition shadow-sm font-bold uppercase"><i class="fas fa-edit"></i> Alterar</button>` : ''}
+                            </div>`;
+
+                            if ((role === 'PROVIDER' || role === 'ADMIN') && isScheduled) {
+                                schedulingHtml += `
+                                    <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                        <button onclick="App.concludeOS('${os.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold">Marcar Concluída</button>
+                                    </div>`;
+                            }
+                        }
+                    } else if (role === 'PROVIDER' && isPending) {
                         const myTechs = state.data.technicians.filter(t => t.providerId === state.currentUser.id);
                         const options = myTechs.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
-                        schedulingHtml = `
+                        schedulingHtml += `
                             <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                                 <label class="text-xs font-bold block mb-1 text-gray-500">Agendar Técnico</label>
                                 <div class="flex flex-col gap-2">
                                     <select id="tech-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600">${options || '<option>Cadastre técnicos...</option>'}</select>
-                                    <input
-  type="datetime-local"
-  id="date-${os.id}"
-  class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600
-         dark:[&::-webkit-calendar-picker-indicator]:invert"
->
+                                    <input type="datetime-local" id="date-${os.id}" class="text-sm p-2 rounded bg-gray-50 dark:bg-dark-900 border dark:border-gray-600 dark:[&::-webkit-calendar-picker-indicator]:invert">
                                     <button onclick="(() => {
                                         const t = document.getElementById('tech-${os.id}').value;
                                         const d = document.getElementById('date-${os.id}').value;
@@ -1003,14 +1071,8 @@
                                     })()" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-bold shadow">Confirmar</button>
                                 </div>
                             </div>`;
-                    } else if ((role === 'PROVIDER' || role === 'ADMIN') && isScheduled) {
-                        schedulingHtml = `
-                             <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                <button onclick="App.concludeOS('${os.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold">Marcar Concluída</button>
-                             </div>`;
                     }
 
-                    // Rodapé com Ações Admin/Provider (Botões redesenhados)
                     let cardFooter = '';
                     if(isAdminOrAnalyst) {
                         cardFooter = `
@@ -1057,7 +1119,13 @@
                             </div>
 
                             <h3 class="font-bold text-lg leading-tight mb-1 text-gray-800 dark:text-gray-100">${os.name}</h3>
-                            <p class="text-xs text-gray-400 mb-3 truncate"><i class="fas fa-map-marker-alt"></i> ${os.address}</p>
+                            <p class="text-xs text-gray-400 mb-3 truncate flex items-center gap-2">
+                                <i class="fas fa-map-marker-alt"></i> 
+                                <span class="truncate" title="${os.address}">${os.address}</span>
+                                <button onclick="App.copyAddress('${os.address}')" class="text-gray-500 hover:text-blue-500 transition ml-auto" title="Copiar Endereço">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </p>
                             
                             <div class="grid grid-cols-2 gap-y-2 text-sm text-gray-600 dark:text-gray-300">
                                 <div class="flex items-center">
@@ -1070,13 +1138,6 @@
                                 <div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Técnico Local</span> ${os.tech_client}</div>
                                 ${os.contact ? `<div class="col-span-2"><span class="block text-[10px] uppercase text-gray-400">Contato</span> <a href="https://wa.me/55${os.contact.replace(/\D/g,'')}" target="_blank" class="text-green-500 hover:underline"><i class="fab fa-whatsapp"></i> ${os.contact}</a></div>` : ''}
                             </div>
-
-                            ${os.assigned_tech ? `
-                                <div class="mt-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 p-2 rounded">
-                                    <div class="text-xs text-green-700 dark:text-green-400 font-bold"><i class="fas fa-user-check"></i> ${os.assigned_tech}</div>
-                                    <div class="text-xs text-gray-500">${new Date(os.scheduled_date).toLocaleString()}</div>
-                                </div>
-                            ` : ''}
 
                             ${schedulingHtml}
                             ${cardFooter}
@@ -1092,7 +1153,6 @@
                 grid.innerHTML = '';
                 list.innerHTML = '';
 
-                // Datas do calendário baseado no estado
                 const currentMonth = state.calendar.month;
                 const currentYear = state.calendar.year;
                 
@@ -1102,7 +1162,6 @@
                 const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
                 const currentMonthStr = (currentMonth+1).toString().padStart(2,'0');
                 
-                // Preenchimento dos dias vazios
                 for(let i=0; i<firstDay; i++) {
                     const empty = document.createElement('div');
                     empty.className = 'bg-transparent';
@@ -1116,14 +1175,12 @@
                     const availabilities = state.data.availability.filter(a => a.dateStr === fullDate);
                     const isMe = state.currentUser ? availabilities.some(a => a.providerId === state.currentUser.id) : false;
                     
-                    // Busca Ordens Agendadas neste dia
                     const dailyOrders = state.data.orders.filter(o => {
                         if(!o.scheduled_date) return false;
                         const dateOnly = o.scheduled_date.split('T')[0];
                         return dateOnly === fullDate;
                     });
 
-                    // Estilização Dinâmica
                     let bgStyle = 'bg-gray-50 dark:bg-dark-700';
                     
                     if(isMe && state.currentUser.role === 'PROVIDER') {
@@ -1135,18 +1192,14 @@
                     const div = document.createElement('div');
                     div.className = `calendar-day rounded border dark:border-gray-600 flex flex-col items-center justify-start p-1 relative overflow-hidden ${bgStyle}`;
                     div.onclick = (e) => {
-                        // Evita abrir modal se clicar na tag da OS (futuro)
                         if(e.target.tagName !== 'SPAN') App.toggleAvailability(i);
                     };
                     
-                    // Número do Dia
                     div.innerHTML = `<span class="text-xs font-bold text-gray-500 mb-1 z-0">${i}</span>`;
                     
-                    // Container para conteúdo do dia
                     const contentDiv = document.createElement('div');
                     contentDiv.className = 'flex flex-col gap-1 w-full items-center overflow-y-auto day-content max-h-[60px]';
 
-                    // Pontos de Disponibilidade
                     if (availabilities.length > 0) {
                         const dots = document.createElement('div');
                         dots.className = 'flex gap-1 flex-wrap justify-center px-1 mb-1';
@@ -1163,7 +1216,6 @@
                         contentDiv.appendChild(dots);
                     }
 
-                    // Tags de OS
                     if (dailyOrders.length > 0) {
                         dailyOrders.forEach(o => {
                             const osTag = document.createElement('span');
@@ -1179,10 +1231,8 @@
                     grid.appendChild(div);
                 }
 
-                // Legenda de Cores (Disponibilidade)
                 const availableMap = {};
                 state.data.availability.forEach(a => {
-                    // Filtra apenas para o mês exibido
                     if (!a.dateStr.startsWith(`${currentYear}-${currentMonthStr}`)) return;
 
                     const provider = state.data.users.find(u => u.id === a.providerId);
@@ -1275,6 +1325,78 @@
                 `).join('');
             },
 
+            // --- Lógica Nova do Mapa ---
+            renderMap: async () => {
+                if (!leafletMap) {
+                    leafletMap = L.map('map-container').setView([-14.235, -51.925], 4); // Centro do Brasil
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(leafletMap);
+                }
+
+                // Ajusta o tamanho caso a div estivesse hidden quando carregou
+                setTimeout(() => leafletMap.invalidateSize(), 200);
+
+                // Limpa marcadores antigos
+                if (View.mapLayerGroup) leafletMap.removeLayer(View.mapLayerGroup);
+                View.mapLayerGroup = L.layerGroup().addTo(leafletMap);
+
+                // Filtra para mostrar apenas OS não concluídas
+                const activeOrders = state.data.orders.filter(o => o.status === 'pendente' || o.status === 'agendada');
+                let dataChanged = false;
+
+                for (const os of activeOrders) {
+                    if (!os.lat || !os.lng) {
+                        try {
+                            // Delay educativo: A API Nominatim restringe muitas chamadas rápidas
+                            await new Promise(r => setTimeout(r, 1500)); 
+                            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(os.address)}`);
+                            const data = await response.json();
+                            
+                            if (data && data.length > 0) {
+                                os.lat = parseFloat(data[0].lat);
+                                os.lng = parseFloat(data[0].lon);
+                                dataChanged = true;
+                            } else {
+                                os.lat = 'not_found';
+                                os.lng = 'not_found';
+                                dataChanged = true;
+                            }
+                        } catch (e) {
+                            console.error("Erro ao buscar coordenadas para:", os.address);
+                        }
+                    }
+
+                    if (os.lat && os.lng && os.lat !== 'not_found') {
+                        const colorClass = os.status === 'agendada' ? '#22C55E' : '#3B82F6';
+                        
+                        const circle = L.circleMarker([os.lat, os.lng], {
+                            color: colorClass,
+                            fillColor: colorClass,
+                            fillOpacity: 0.8,
+                            radius: 8,
+                            weight: 2
+                        });
+
+                        circle.bindPopup(`
+                            <div class="text-sm font-sans dark:text-gray-800">
+                                <strong class="text-blue-600">#${os.code}</strong><br>
+                                <b class="text-gray-800">${os.name}</b><br>
+                                Status: <span class="uppercase text-[10px] font-bold px-1 rounded bg-gray-200 text-gray-700">${os.status}</span><br>
+                                ${os.assigned_tech ? `<div class="mt-1 text-xs text-green-700"><i class="fas fa-user-check"></i> ${os.assigned_tech}</div>` : ''}
+                            </div>
+                        `);
+                        
+                        View.mapLayerGroup.addLayer(circle);
+                    }
+                }
+
+                // Salva silenciosamente caso tenha achado coordenadas novas para evitar retrabalho da API
+                if (dataChanged) {
+                    DB.saveData(true);
+                }
+            },
+
             openModal: (id) => {
                 document.getElementById(id).classList.remove('hidden');
                 if(id === 'modal-admin-settings') View.renderAdminSettings();
@@ -1297,5 +1419,3 @@
     </script>
 </body>
 </html>
-
-
